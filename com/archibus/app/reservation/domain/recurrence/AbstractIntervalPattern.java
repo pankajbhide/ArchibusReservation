@@ -1,0 +1,203 @@
+package com.archibus.app.reservation.domain.recurrence;
+
+import java.util.*;
+
+import javax.xml.bind.annotation.*;
+
+import com.archibus.app.reservation.domain.*;
+import com.archibus.app.reservation.service.RecurrenceService;
+import com.archibus.app.reservation.service.actions.SaveRecurringReservationOccurrenceAction;
+
+/**
+ * Interval pattern.
+ *
+ * @author Bart Vanderschoot
+ */
+@XmlAccessorType(XmlAccessType.FIELD)
+@XmlRootElement(name = "IntervalPattern")
+public abstract class AbstractIntervalPattern extends Recurrence {
+
+    /**
+     * Interface to implement for looping through recurrent reservations.
+     *
+     * @author Bart Vanderschoot
+     */
+    public interface OccurrenceAction {
+        /**
+         * Handle a single occurrence of the interval pattern.
+         *
+         * @param date the date of the occurrence to handle
+         * @return true if the loop should continue, false to stop
+         *
+         * @throws ReservationException reservation exception
+         */
+        boolean handleOccurrence(Date date) throws ReservationException;
+    }
+
+    /**
+     * Interface to implement for looping through recurrent reservations with special handling for
+     * modified occurrences.
+     *
+     * @author Yorik Gerlo
+     */
+    public interface ModifiedOccurrenceAction extends OccurrenceAction {
+        /**
+         * Handle a single occurrence of the interval pattern.
+         *
+         * @param date the date of the occurrence to handle
+         * @param modifiedTimePeriod the modified time period for this occurrence
+         * @return true if the loop should continue, false to stop
+         *
+         * @throws ReservationException reservation exception
+         */
+        boolean handleOccurrence(Date date, TimePeriod modifiedTimePeriod)
+                throws ReservationException;
+
+        /**
+         * Handle a single occurrence of the interval pattern which is marked cancelled.
+         *
+         * @param date the date of the occurrence to handle
+         * @return true if the loop should continue, false to stop
+         *
+         * @throws ReservationException reservation exception
+         */
+        boolean handleCancelledOccurrence(Date date) throws ReservationException;
+    }
+
+    /** The interval. */
+    protected Integer interval = 1;
+
+    /**
+     * Default constructor.
+     */
+    protected AbstractIntervalPattern() {
+        super();
+    }
+
+    /**
+     * Constructor with parameters.
+     *
+     * @param startDate start date
+     * @param endDate end date
+     * @param interval interval
+     */
+    public AbstractIntervalPattern(final Date startDate, final Date endDate, final Integer interval) {
+        super();
+        setInterval(interval);
+        setStartDate(startDate);
+        setEndDate(endDate);
+    }
+
+    /**
+     * Constructor with parameters.
+     *
+     * @param startDate start date
+     * @param interval interval
+     */
+    public AbstractIntervalPattern(final Date startDate, final Integer interval) {
+        super();
+        setInterval(interval);
+        setStartDate(startDate);
+    }
+
+    /**
+     * Loop through all repeats of the pattern, thus excluding the first instance. End the loop if
+     * the OccurrenceAction return value is false.
+     *
+     * @param action the action to perform on each repeat
+     * @throws ReservationException reservation exception
+     */
+    public final void loopThroughRepeats(final OccurrenceAction action) throws ReservationException {
+        final List<Date> dateList =
+                RecurrenceService.getDateList(getStartDate(), getEndDate(), this.toString());
+
+        this.checkActualEndDate(action, dateList);
+
+        int index = 1;
+        boolean userWantsToContinue = true;
+        while (userWantsToContinue && index < dateList.size()) {
+            final Date originalDate = dateList.get(index);
+            // skip this date if the occurrence is cancelled
+            if (this.isDateCancelled(originalDate)) {
+                if (action instanceof ModifiedOccurrenceAction) {
+                    userWantsToContinue =
+                            ((ModifiedOccurrenceAction) action)
+                                .handleCancelledOccurrence(originalDate);
+                }
+            } else {
+                // provide the modified time period if defined and the occurrence action supports it
+                final TimePeriod modifiedTimePeriod = this.getModifiedTimePeriod(originalDate);
+                if (action instanceof ModifiedOccurrenceAction && modifiedTimePeriod != null) {
+                    userWantsToContinue =
+                            ((ModifiedOccurrenceAction) action).handleOccurrence(originalDate,
+                                modifiedTimePeriod);
+                } else {
+                    userWantsToContinue = action.handleOccurrence(originalDate);
+                }
+            }
+            index++;
+        }
+    }
+
+    /**
+     * Check whether the actual end date generated by the recurrence service corresponds to the
+     * requested end date. This check is only required for specific occurrence actions.
+     *
+     * Throws an exception if the check fails.
+     *
+     * @param action the occurrence action
+     * @param dateList the list of generated dates
+     */
+    private void checkActualEndDate(final OccurrenceAction action, final List<Date> dateList) {
+        if (action instanceof SaveRecurringReservationOccurrenceAction && getEndDate() != null
+                && !dateList.isEmpty()) {
+            final Date requestedEndDate = getEndDate();
+            final Date actualEndDate = dateList.get(dateList.size() - 1);
+            final int numberOfOccurrences =
+                    this.getNumberOfOccurrences() == null ? 0 : this.getNumberOfOccurrences();
+            if (requestedEndDate.after(actualEndDate)
+                    || numberOfOccurrences - this.getNumberOfSkippedOccurrences() > dateList.size()) {
+                this.reportBadEndDate(dateList);
+            }
+        }
+    }
+
+    /**
+     * Report an invalid end date to the user through a ReservationException.
+     *
+     * @param dateList the generated list of dates
+     * @throws ReservationException the exception used to indicate the problem to the user
+     */
+    private void reportBadEndDate(final List<Date> dateList) throws ReservationException {
+        if (dateList.size() == RecurrenceService.getMaxOccurrences()) {
+            // @translatable
+            throw new ReservationException(
+                "You can only create reservations for up to {0} occurrences. Use the recurrence dialog to enter a smaller number of occurrences.",
+                AbstractIntervalPattern.class, dateList.size());
+        } else {
+            // @translatable
+            throw new ReservationException(
+                "The recurrence end date is invalid. To create the reservation, first use the recurrence dialog to correct the end date.",
+                AbstractIntervalPattern.class);
+        }
+    }
+
+    /**
+     * Get the interval.
+     *
+     * @return interval
+     */
+    public int getInterval() {
+        return this.interval;
+    }
+
+    /**
+     * Set the interval.
+     *
+     * @param interval interval
+     */
+    public final void setInterval(final int interval) {
+        this.interval = interval;
+    }
+
+}
