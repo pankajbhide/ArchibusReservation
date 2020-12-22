@@ -375,6 +375,14 @@ public class CalendarServiceWrapper extends RoomReservationServiceBase {
         return isFullSeries;
     }
 
+    /**lbnl - Brent Hopkins - send a cancel email to any attendees removed from a reservation **/
+    public final void lbnlHelpCancelEmails(RoomReservation reservation, RoomReservation origReservation, Boolean allRecurrences){
+
+        if(!origReservation.getComments().equals(reservation.getComments()))
+            this.calendarService.lbnlCancelCalendarEventHelp(reservation, origReservation, allRecurrences, "Cancellation comment: " + reservation.getComments());
+        else this.calendarService.lbnlCancelCalendarEventHelp(reservation, origReservation, allRecurrences, "");
+    }
+
     /**
      * Handle an exception that occurred interacting with the calendar service.
      *

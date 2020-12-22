@@ -202,4 +202,11 @@ public class IcsCalendarService implements ICalendarService {
 
         }
     }
+
+    /**lbnl - Brent Hopkins - send a cancel email to any attendees removed from a reservation **/
+    @Override
+    public void lbnlCancelCalendarEventHelp(RoomReservation reservation, RoomReservation origReserv, boolean allRecurrences, String message)
+            throws ExceptionBase {
+        this.calendarMessageService.lbnlCancelCalendarEvent(reservation, origReserv, allRecurrences, message);
+    }
 }

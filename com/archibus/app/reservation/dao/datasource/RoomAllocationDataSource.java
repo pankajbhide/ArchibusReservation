@@ -251,7 +251,9 @@ public class RoomAllocationDataSource extends AbstractAllocationDataSource<RoomA
                     + " SELECT ${parameters['startDate']}, ${parameters['startTime']}, ${parameters['endTime']}, ";
         }
         sql += " ${parameters['reserveId']}, bl_id, fl_id, rm_id, config_id, rm_arrange_type_id "
-                + " FROM rm_arrange WHERE " + locationRestriction + AND + timeRestriction;
+                + " FROM rm_arrange WHERE" + locationRestriction; //+ AND + timeRestriction;
+
+        //LBNL / BER - removed the restriction that prevents concurrent reservations for a room
 
         executeSqlForBean(bean, dataSource, sql);
         // get the primary key from the database

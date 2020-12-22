@@ -107,4 +107,8 @@ public interface ICalendarService {
     void cancelAppointmentOccurrence(final IReservation reservation, final String message,
             final boolean notifyOrganizer) throws ExceptionBase;
 
+    /**lbnl - Brent Hopkins - send a cancel email to any attendees removed from a reservation **/
+    void lbnlCancelCalendarEventHelp(final RoomReservation reservation, final RoomReservation origReserv, final boolean allRecurrences, final String message)
+        throws ExceptionBase;
+
 }

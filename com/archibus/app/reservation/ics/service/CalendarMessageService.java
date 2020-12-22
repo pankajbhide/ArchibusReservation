@@ -1,6 +1,7 @@
 package com.archibus.app.reservation.ics.service;
 
 import java.util.Map;
+import java.util.*;
 
 import com.archibus.app.reservation.dao.IConferenceCallReservationDataSource;
 import com.archibus.app.reservation.domain.*;
@@ -19,6 +20,9 @@ import com.archibus.utility.StringUtil;
  *
  * @author PROCOS
  * @since 23.2
+ *
+ *  Revised by Pankaj at LBNL
+ *  Prevent sending emails to the organizers (too many emails)
  *
  */
 public class CalendarMessageService {
@@ -47,9 +51,9 @@ public class CalendarMessageService {
      * @param conferenceId the conference id in case of a conference call reservation (may be null)
      */
     public final void sendEmailInvitations(final RoomReservation reservation,
-            final RoomReservation originalReserv, final String invitationType,
-            final boolean allRecurrences, final boolean requireReply, final String message,
-            final Integer conferenceId) {
+                                           final RoomReservation originalReserv, final String invitationType,
+                                           final boolean allRecurrences, final boolean requireReply, final String message,
+                                           final Integer conferenceId) {
 
         final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
 
@@ -61,10 +65,10 @@ public class CalendarMessageService {
         final boolean recurring = StringUtil.notNullOrEmpty(reservation.getRecurringRule());
 
         final EmailModel emailModel = new EmailModel(invitationType, conferenceId, recurring,
-            requireReply, allRecurrences, locale);
+                requireReply, allRecurrences, locale);
 
         final Map<String, Object> dataModel = DataModelHelper.prepareDataModel(messages, emailModel,
-            reservation, message, this.timeZoneCache);
+                reservation, message, this.timeZoneCache);
 
         if (emailModel.isChange() && originalReserv != null
                 && reservation.getRecurringDateModified() == 1
@@ -72,38 +76,104 @@ public class CalendarMessageService {
             // when updating a recurring meeting occurrence and the dates
             // changed, then cancel the previous meeting
             final EmailModel cancelModel = new EmailModel(EmailModel.TYPE_CANCEL, conferenceId,
-                recurring, requireReply, allRecurrences, locale);
+                    recurring, requireReply, allRecurrences, locale);
             final Map<String, Object> cancelDataModel = DataModelHelper.prepareDataModel(messages,
-                emailModel, originalReserv, message, this.timeZoneCache);
+                    emailModel, originalReserv, message, this.timeZoneCache);
             final IcsModel cancelIcsModel = setupIcsModel(messages, cancelModel, cancelDataModel,
-                originalReserv, originalReserv);
+                    originalReserv, originalReserv);
 
+            /* LBNL Pankaj
             IcsAttachmentHelper.addIcsToAttachments(context, cancelIcsModel, attendees,
                 (String) cancelDataModel.get(IcsConstants.DATE_START), emailModel.getAttachments(),
-                false);
+                false); */
 
             // create the organizer attachment
             IcsAttachmentHelper.addIcsToAttachments(context, cancelIcsModel, attendees,
-                (String) cancelDataModel.get(IcsConstants.DATE_START),
-                emailModel.getOrgAttachments(), true);
+                    (String) cancelDataModel.get(IcsConstants.DATE_START),
+                    emailModel.getOrgAttachments(), true);
 
         }
         this.generateIcsAttachments(reservation, originalReserv, message, attendees, messages,
-            emailModel, dataModel);
+                emailModel, dataModel);
 
         final IcsMessage emailMessage = createEmailMessage(allRecurrences, locale, dataModel);
         // send the email
         emailMessage.setMailFrom(from);
         emailMessage.setMailTo(attendees);
-        MessageHelper.sendMessage(emailModel.getAttachments(), emailMessage, this.mailPreferences);
+        /* LBNL Pankaj */
+        // MessageHelper.sendMessage(emailModel.getAttachments(), emailMessage, this.mailPreferences);
+        MessageHelper.sendMessage(emailModel.getOrgAttachments(), emailMessage,
+                this.mailPreferences);
 
-        final IcsMessage reqEmailMessage = emailMessage.copy();
+        /* LBNL Pankaj
+        /* final IcsMessage reqEmailMessage = emailMessage.copy();
 
         // send to the organizer
         reqEmailMessage.setMailFrom(EmailNotificationHelper.getServiceEmail());
         reqEmailMessage.setMailTo(from);
         MessageHelper.sendMessage(emailModel.getOrgAttachments(), reqEmailMessage,
-            this.mailPreferences);
+            this.mailPreferences);*/
+    }
+
+
+    /**lbnl - Brent Hopkins - send a cancel email to any attendees removed from a reservation **/
+    public final void lbnlCancelCalendarEvent(final RoomReservation reservation,
+                                           final RoomReservation originalReserv,
+                                           final boolean allRecurrences, final String message) {
+
+        final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
+
+        final String from = this.employeeService.getEmployeeEmail(reservation.getRequestedBy());
+        final String locale = EmailNotificationHelper.getLocaleForEmail(from);
+        final String[] oAttendees = IcsAttendeesHelper.prepareAttendees(originalReserv);
+        final String[] nAttendees = IcsAttendeesHelper.prepareAttendees(reservation);
+
+        boolean requireReply = true;
+        String invitationType = EmailModel.TYPE_CANCEL;
+        Integer conferenceId = originalReserv.getConferenceId();
+
+        ArrayList<String> oAttendeesList = new ArrayList<String>();
+        Collections.addAll(oAttendeesList,oAttendees);
+        ArrayList<String> nAttendeesList = new ArrayList<String>();
+        Collections.addAll(nAttendeesList,nAttendees);
+
+        oAttendeesList.removeAll(nAttendeesList);
+
+        if(oAttendeesList.isEmpty()) return; // if no attendees were removed, return without sending an email
+
+        String[] removedAttendees = new String[oAttendeesList.size()];
+        removedAttendees = oAttendeesList.toArray(removedAttendees);
+
+
+        final Map<String, String> messages = getSendMailMessages(locale);
+        final boolean recurring = StringUtil.notNullOrEmpty(originalReserv.getRecurringRule());
+
+        final EmailModel emailModel = new EmailModel(invitationType, conferenceId, recurring,
+                requireReply, allRecurrences, locale);
+
+        final Map<String, Object> dataModel = DataModelHelper.prepareDataModel(messages, emailModel,
+                originalReserv, message, this.timeZoneCache);
+
+        this.generateIcsAttachments(originalReserv, originalReserv, message, removedAttendees, messages,
+                emailModel, dataModel);
+
+        final IcsMessage emailMessage = createEmailMessage(allRecurrences, locale, dataModel);
+        // send the email
+        emailMessage.setMailFrom(from);
+        emailMessage.setMailTo(removedAttendees);
+        /* LBNL Pankaj */
+        // MessageHelper.sendMessage(emailModel.getAttachments(), emailMessage, this.mailPreferences);
+        MessageHelper.sendMessage(emailModel.getOrgAttachments(), emailMessage,
+                this.mailPreferences);
+
+        /* LBNL Pankaj
+        /* final IcsMessage reqEmailMessage = emailMessage.copy();
+
+        // send to the organizer
+        reqEmailMessage.setMailFrom(EmailNotificationHelper.getServiceEmail());
+        reqEmailMessage.setMailTo(from);
+        MessageHelper.sendMessage(emailModel.getOrgAttachments(), reqEmailMessage,
+            this.mailPreferences);*/
     }
 
     /**
@@ -118,9 +188,9 @@ public class CalendarMessageService {
      * @param dataModel the data model containing reservation information to include in the ICS
      */
     private void generateIcsAttachments(final RoomReservation reservation,
-            final RoomReservation originalReserv, final String message, final String[] attendees,
-            final Map<String, String> messages, final EmailModel emailModel,
-            final Map<String, Object> dataModel) {
+                                        final RoomReservation originalReserv, final String message, final String[] attendees,
+                                        final Map<String, String> messages, final EmailModel emailModel,
+                                        final Map<String, Object> dataModel) {
         final IcsModel icsModel =
                 setupIcsModel(messages, emailModel, dataModel, reservation, originalReserv);
 
@@ -132,10 +202,10 @@ public class CalendarMessageService {
         if (icsModel != null) {
             final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
             IcsAttachmentHelper.addIcsToAttachments(context, icsModel, attendees, startDate,
-                emailModel.getAttachments(), false);
+                    emailModel.getAttachments(), false);
             // create the organizer attachment
             IcsAttachmentHelper.addIcsToAttachments(context, icsModel, attendees, startDate,
-                emailModel.getOrgAttachments(), true);
+                    emailModel.getOrgAttachments(), true);
 
             if (emailModel.isChange() && emailModel.isAllRecurrences()
                     && !emailModel.isDisconnect()) {
@@ -158,8 +228,8 @@ public class CalendarMessageService {
      * @param conferenceId conference call identifier
      */
     public void disconnectInvitations(final RoomReservation reservation,
-            final boolean allRecurrences, final boolean requireReply, final String message,
-            final Integer conferenceId) {
+                                      final boolean allRecurrences, final boolean requireReply, final String message,
+                                      final Integer conferenceId) {
         final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
 
         final String from = this.employeeService.getEmployeeEmail(reservation.getRequestedBy());
@@ -171,33 +241,38 @@ public class CalendarMessageService {
         final boolean recurring = StringUtil.notNullOrEmpty(reservation.getRecurringRule());
 
         final EmailModel emailModel = new EmailModel(invitationType, conferenceId, recurring,
-            requireReply, allRecurrences, locale);
+                requireReply, allRecurrences, locale);
 
         final Map<String, Object> dataModel = DataModelHelper.prepareDataModel(messages, emailModel,
-            reservation, message, this.timeZoneCache);
+                reservation, message, this.timeZoneCache);
         final IcsModel icsModel =
                 setupIcsModel(messages, emailModel, dataModel, reservation, reservation);
 
         final String startDate = (String) dataModel.get(IcsConstants.DATE_START);
         IcsAttachmentHelper.addIcsToAttachments(context, icsModel, attendees, startDate,
-            emailModel.getAttachments(), false);
+                emailModel.getAttachments(), false);
         // create the organizer attachment
         IcsAttachmentHelper.addIcsToAttachments(context, icsModel, attendees, startDate,
-            emailModel.getOrgAttachments(), true);
+                emailModel.getOrgAttachments(), true);
 
         final IcsMessage emailMessage = createEmailMessage(allRecurrences, locale, dataModel);
         // send the email
         emailMessage.setMailFrom(from);
         emailMessage.setMailTo(attendees);
-        MessageHelper.sendMessage(emailModel.getAttachments(), emailMessage, this.mailPreferences);
 
-        final IcsMessage reqEmailMessage = emailMessage.copy();
+        // LBNL Pankaj
+        //MessageHelper.sendMessage(emailModel.getAttachments(), emailMessage, this.mailPreferences);
+        MessageHelper.sendMessage(emailModel.getOrgAttachments(), emailMessage,
+                this.mailPreferences);
+
+        // LBNL Pankaj
+        /*final IcsMessage reqEmailMessage = emailMessage.copy();
 
         // send to the organizer
         reqEmailMessage.setMailFrom(EmailNotificationHelper.getServiceEmail());
         reqEmailMessage.setMailTo(from);
         MessageHelper.sendMessage(emailModel.getOrgAttachments(), reqEmailMessage,
-            this.mailPreferences);
+            this.mailPreferences);*/
     }
 
     /**
@@ -211,26 +286,26 @@ public class CalendarMessageService {
      * @param emailModel the email model
      */
     private void addCancelledExceptionsIcs(final RoomReservation reservation, final String message,
-            final String[] attendees, final Map<String, String> messages,
-            final EmailModel emailModel) {
+                                           final String[] attendees, final Map<String, String> messages,
+                                           final EmailModel emailModel) {
 
         final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
         final EmailModel exceptionModel =
                 new EmailModel(EmailModel.TYPE_CANCEL, emailModel.getConferenceId(), true,
-                    emailModel.isRequireReply(), false, emailModel.getLocale());
+                        emailModel.isRequireReply(), false, emailModel.getLocale());
 
         for (final RoomReservation cancelledRes : reservation.getCreatedReservations()) {
             if (cancelledRes.getRecurringDateModified() != 0) {
                 final Map<String, Object> exDataModel = DataModelHelper.prepareDataModel(messages,
-                    exceptionModel, cancelledRes, message, this.timeZoneCache);
+                        exceptionModel, cancelledRes, message, this.timeZoneCache);
                 final IcsModel exIcsModel = setupIcsModel(messages, exceptionModel, exDataModel,
-                    cancelledRes, cancelledRes);
+                        cancelledRes, cancelledRes);
                 IcsAttachmentHelper.addIcsToAttachments(context, exIcsModel, attendees,
-                    (String) exDataModel.get(IcsConstants.DATE_START), emailModel.getAttachments(),
-                    false);
+                        (String) exDataModel.get(IcsConstants.DATE_START), emailModel.getAttachments(),
+                        false);
                 IcsAttachmentHelper.addIcsToAttachments(context, exIcsModel, attendees,
-                    (String) exDataModel.get(IcsConstants.DATE_START),
-                    emailModel.getOrgAttachments(), true);
+                        (String) exDataModel.get(IcsConstants.DATE_START),
+                        emailModel.getOrgAttachments(), true);
             }
         }
     }
@@ -245,26 +320,26 @@ public class CalendarMessageService {
      * @param emailModel the email model
      */
     private void addModifiedExceptionsIcs(final RoomReservation reservation, final String message,
-            final String[] attendees, final Map<String, String> messages,
-            final EmailModel emailModel) {
+                                          final String[] attendees, final Map<String, String> messages,
+                                          final EmailModel emailModel) {
 
         final EventHandlerContext context = ContextStore.get().getEventHandlerContext();
         final EmailModel exceptionModel =
                 new EmailModel(EmailModel.TYPE_UPDATE, emailModel.getConferenceId(), true,
-                    emailModel.isRequireReply(), false, emailModel.getLocale());
+                        emailModel.isRequireReply(), false, emailModel.getLocale());
 
         for (final RoomReservation occurrence : reservation.getCreatedReservations()) {
             if (!ReservationEquivalenceChecker.isEquivalent(reservation, occurrence)) {
                 final Map<String, Object> exDataModel = DataModelHelper.prepareDataModel(messages,
-                    exceptionModel, occurrence, message, this.timeZoneCache);
+                        exceptionModel, occurrence, message, this.timeZoneCache);
                 final IcsModel exIcsModel = setupIcsModel(messages, exceptionModel, exDataModel,
-                    occurrence, occurrence);
+                        occurrence, occurrence);
                 IcsAttachmentHelper.addIcsToAttachments(context, exIcsModel, attendees,
-                    (String) exDataModel.get(IcsConstants.DATE_START), emailModel.getAttachments(),
-                    false);
+                        (String) exDataModel.get(IcsConstants.DATE_START), emailModel.getAttachments(),
+                        false);
                 IcsAttachmentHelper.addIcsToAttachments(context, exIcsModel, attendees,
-                    (String) exDataModel.get(IcsConstants.DATE_START),
-                    emailModel.getOrgAttachments(), true);
+                        (String) exDataModel.get(IcsConstants.DATE_START),
+                        emailModel.getOrgAttachments(), true);
             }
         }
     }
@@ -278,13 +353,15 @@ public class CalendarMessageService {
      * @return the message
      */
     private IcsMessage createEmailMessage(final boolean allRecurrences, final String locale,
-            final Map<String, Object> dataModel) {
+                                          final Map<String, Object> dataModel) {
         final String bodyTemplate;
         if (allRecurrences) {
             bodyTemplate = IcsConstants.BODY_REC_MSG_ID;
         } else {
             bodyTemplate = IcsConstants.BODY_MSG_ID;
         }
+
+
         final IcsMessage emailMessage =
                 createMessage(IcsConstants.SUBJECT_MSG_ID, bodyTemplate, dataModel, locale);
         // outlook remove line breaks hack
@@ -350,15 +427,15 @@ public class CalendarMessageService {
      * @return the ICS email model
      */
     private IcsModel setupIcsModel(final Map<String, String> messages, final EmailModel emailModel,
-            final Map<String, Object> dataModel, final RoomReservation reservation,
-            final RoomReservation originalReserv) {
+                                   final Map<String, Object> dataModel, final RoomReservation reservation,
+                                   final RoomReservation originalReserv) {
 
         final String uid = IcsAttachmentHelper.generateUid(emailModel, reservation);
         final Map<String, Object> icsDataModel =
                 DataModelHelper.getIcsDataModelMap(messages, emailModel, dataModel);
 
         final IcsMessage ics = createMessage(IcsConstants.SUBJECT_MSG_ID, IcsConstants.ICS_MSG_ID,
-            icsDataModel, emailModel.getLocale());
+                icsDataModel, emailModel.getLocale());
         // outlook remove line breaks hack
         ics.setBody(fixLineBreaks(ics.getBody()));
 
@@ -388,20 +465,20 @@ public class CalendarMessageService {
      * @return the ICS model
      */
     private IcsModel createIcsModel(final EmailModel emailModel, final RoomReservation reservation,
-            final RoomReservation originalReserv, final String uid, final IcsMessage ics,
-            final MeetingLocationModel location) {
+                                    final RoomReservation originalReserv, final String uid, final IcsMessage ics,
+                                    final MeetingLocationModel location) {
         final IcsModel model = new IcsModel(location, emailModel, ics.getSubject(), ics.getBody(),
-            this.employeeService.getEmployeeEmail(reservation.getRequestedBy()), uid,
-            reservation.getTimePeriod());
+                this.employeeService.getEmployeeEmail(reservation.getRequestedBy()), uid,
+                reservation.getTimePeriod());
 
         if (emailModel.isAllRecurrences()) {
             model.setUntilDate(
-                MeetingInformationHelper.calcUntilDateTime(reservation, location.getTimezone()));
+                    MeetingInformationHelper.calcUntilDateTime(reservation, location.getTimezone()));
             model.setRecurrence((AbstractIntervalPattern) reservation.getRecurrence());
 
             if (emailModel.isChange() && !emailModel.isDisconnect()) {
                 model.setExceptionDates(MeetingInformationHelper
-                    .getCancelledRecurrences(reservation, this.reservationDs));
+                        .getCancelledRecurrences(reservation, this.reservationDs));
             }
         } else if (emailModel.isRecurring() && reservation.getRecurringDateModified() == 0) {
             model.setRecurrenceId(originalReserv.getStartDateTime());
@@ -422,8 +499,8 @@ public class CalendarMessageService {
      *         have been moved to a different date
      */
     private IcsModel createCancelIcsModel(final EmailModel emailModel,
-            final RoomReservation reservation, final String uid, final IcsMessage ics,
-            final MeetingLocationModel location) {
+                                          final RoomReservation reservation, final String uid, final IcsMessage ics,
+                                          final MeetingLocationModel location) {
 
         TimePeriod timePeriod = null;
         if (emailModel.isAllRecurrences() && reservation.getRecurringDateModified() != 0) {
@@ -444,12 +521,12 @@ public class CalendarMessageService {
         IcsModel model = null;
         if (timePeriod != null) {
             model = new IcsModel(location, emailModel, ics.getSubject(), ics.getBody(),
-                this.employeeService.getEmployeeEmail(reservation.getRequestedBy()), uid,
-                timePeriod);
+                    this.employeeService.getEmployeeEmail(reservation.getRequestedBy()), uid,
+                    timePeriod);
 
             if (emailModel.isAllRecurrences()) {
                 model.setUntilDate(MeetingInformationHelper.calcUntilDateTime(reservation,
-                    location.getTimezone()));
+                        location.getTimezone()));
                 model.setRecurrence((AbstractIntervalPattern) reservation.getRecurrence());
 
             } else if (emailModel.isRecurring() && reservation.getRecurringDateModified() == 0) {
@@ -470,7 +547,7 @@ public class CalendarMessageService {
      * @return the email message
      */
     private IcsMessage createMessage(final String subjectId, final String bodyId,
-            final Map<String, Object> dataModel, final String locale) {
+                                     final Map<String, Object> dataModel, final String locale) {
         final IcsMessage message = new IcsMessage();
 
         message.setActivityId(IcsConstants.ACTIVITY_ID);
@@ -491,15 +568,15 @@ public class CalendarMessageService {
      */
     private Map<String, String> getSendMailMessages(final String locale) {
         final Map<String, String> messages = ReservationsContextHelper.localizeMessages(
-            IcsConstants.REFERENCED_BY, locale, IcsConstants.SUBJECT_REC_MSG,
-            IcsConstants.SUBJECT_CAN_MSG, IcsConstants.SUBJECT_UPD_MSG,
-            IcsConstants.BODY_INVITE_MSG, IcsConstants.BODY_CANCEL_MSG,
-            IcsConstants.BODY_INVREC_MSG, IcsConstants.BODY_DTS_LIST_MSG,
-            IcsConstants.BODY_CAN_LIST_MSG, IcsConstants.BODY_START_DT_MSG,
-            IcsConstants.BODY_START_TM_MSG, IcsConstants.BODY_END_TM_MSG);
+                IcsConstants.REFERENCED_BY, locale, IcsConstants.SUBJECT_REC_MSG,
+                IcsConstants.SUBJECT_CAN_MSG, IcsConstants.SUBJECT_UPD_MSG,
+                IcsConstants.BODY_INVITE_MSG, IcsConstants.BODY_CANCEL_MSG,
+                IcsConstants.BODY_INVREC_MSG, IcsConstants.BODY_DTS_LIST_MSG,
+                IcsConstants.BODY_CAN_LIST_MSG, IcsConstants.BODY_START_DT_MSG,
+                IcsConstants.BODY_START_TM_MSG, IcsConstants.BODY_END_TM_MSG);
 
         messages.put(IcsConstants.CONF_CALL_MEETING_LOCATION, ReservationsContextHelper
-            .localizeMessage("OUTLOOK_PLUGIN", locale, IcsConstants.CONF_CALL_MEETING_LOCATION));
+                .localizeMessage("OUTLOOK_PLUGIN", locale, IcsConstants.CONF_CALL_MEETING_LOCATION));
 
         return messages;
     }

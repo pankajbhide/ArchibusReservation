@@ -88,6 +88,10 @@ public interface IReservationService {
     List<RoomReservation> editRecurringReservation(final RoomReservation reservation)
             throws ReservationException;
 
+    /** LBNL**/
+    List<RoomReservation> lbnlGetRecurringReservation(final RoomReservation reservation)
+            throws ReservationException;
+
     /**
      * Save a single reservation.
      *

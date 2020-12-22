@@ -39,7 +39,7 @@ public final class IcsCalendarBuilder {
      * @return the ICS object
      */
     static Calendar createIcsAttachment(final IcsModel model, final String[] attendees,
-            final boolean addOrganizer) {
+                                        final boolean addOrganizer) {
 
         // set the compatibility with Outlook
         CompatibilityHints.setHintEnabled(CompatibilityHints.KEY_OUTLOOK_COMPATIBILITY, true);
@@ -52,6 +52,9 @@ public final class IcsCalendarBuilder {
         final net.fortuna.ical4j.model.TimeZone timezone =
                 TimeZoneRegistryFactory.getInstance().createRegistry().getTimeZone(tzone);
 
+
+
+
         // enter the time in server time zone
         final DateTime start = getTimezonedDateTime(model.getStartDateTime(), timezone);
 
@@ -60,7 +63,7 @@ public final class IcsCalendarBuilder {
 
         // the day of end is the same as start
         final VEvent meeting = createEvent(model.getSummary(), model.getDescription(),
-            timezone.getVTimeZone(), start, end);
+                timezone.getVTimeZone(), start, end);
 
         final PropertyList<Property> propertyList = meeting.getProperties();
 
@@ -75,6 +78,10 @@ public final class IcsCalendarBuilder {
             sequenceNumber = 0;
         }
 
+        // Pankaj@ LBNL added property
+        propertyList.add(net.fortuna.ical4j.model.property.Transp.TRANSPARENT);
+
+
         // 0 for new or update, 1 for occurrence update and 2 for cancel
         propertyList.add(new Sequence(sequenceNumber));
         propertyList.add(model.getIcsUid());
@@ -82,15 +89,15 @@ public final class IcsCalendarBuilder {
 
         // add attendees
         IcsAttendeesHelper.addAttendees(meeting, attendees, emailModel.isRequireReply(),
-            organizerEmail, addOrganizer);
+                organizerEmail, addOrganizer);
 
         if (model.getRecurrenceId() != null) {
             propertyList
-                .add(new RecurrenceId(getTimezonedDateTime(model.getRecurrenceId(), timezone)));
+                    .add(new RecurrenceId(getTimezonedDateTime(model.getRecurrenceId(), timezone)));
         }
         if (model.isRecurring()) {
             RecurrenceHelper.addRecurringRule(meeting, model.getRecurrence(),
-                new DateTime(model.getUntilDate()));
+                    new DateTime(model.getUntilDate()));
             if (model.getExceptionDates() != null) {
                 RecurrenceHelper.addExceptionDates(meeting, model.getExceptionDates());
             }
@@ -109,7 +116,7 @@ public final class IcsCalendarBuilder {
      * @return the ICS Calendar Object
      */
     private static Calendar createIcsCalendar(final VEvent meeting,
-            final net.fortuna.ical4j.model.TimeZone timezone, final Method method) {
+                                              final net.fortuna.ical4j.model.TimeZone timezone, final Method method) {
         final Calendar icsCalendar = new Calendar();
 
         final PropertyList<Property> icsPropertyList = icsCalendar.getProperties();
@@ -135,9 +142,9 @@ public final class IcsCalendarBuilder {
      * @return the date and time at the requested time zone
      */
     private static DateTime getTimezonedDateTime(final Date dateTime,
-            final net.fortuna.ical4j.model.TimeZone timezone) {
+                                                 final net.fortuna.ical4j.model.TimeZone timezone) {
         final DateTime date = new DateTime(
-            TimeZoneConverter.calculateDateTime(dateTime, timezone.getID(), null).getTime());
+                TimeZoneConverter.calculateDateTime(dateTime, timezone.getID(), null).getTime());
         // set time zone, and calculate the date
         date.setTimeZone(timezone);
         return date;
@@ -154,7 +161,7 @@ public final class IcsCalendarBuilder {
      * @return the meeting event
      */
     private static VEvent createEvent(final String subject, final String body, final VTimeZone vtz,
-            final DateTime start, final DateTime end) {
+                                      final DateTime start, final DateTime end) {
         final VEvent meeting = new VEvent(start, end, subject);
 
         meeting.getProperties().add(vtz.getTimeZoneId());

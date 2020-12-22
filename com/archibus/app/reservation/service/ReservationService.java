@@ -106,7 +106,7 @@ public class ReservationService extends AdminServiceContainer implements IReserv
 
         final List<RoomArrangement> results =
                 this.roomArrangementDataSource.findAvailableRooms(reservation, numberAttendees,
-                    externalAllowed, fixedResourceStandards, allDayEvent, false);
+                    externalAllowed, fixedResourceStandards, allDayEvent, true);
 
         // Convert dayStart / dayEnd to requested time zone.
         TimeZoneConverter.convertToTimeZone(results, reservation.getStartDate(),
@@ -355,6 +355,18 @@ public class ReservationService extends AdminServiceContainer implements IReserv
         return savedReservations;
     }
 
+    /**LBNL**/
+    public final List<RoomReservation> lbnlGetRecurringReservation(final RoomReservation reservation)
+            throws ReservationException {
+
+        // when editing, fetch the existing reservations starting on this date
+        // no need for timezone conversion, timezone is copied from new reservation object
+        final List<RoomReservation> existingReservations = this.reservationDataSource
+                .getByParentId(reservation.getParentId(), reservation.getStartDate(), null, false);
+
+        return existingReservations;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -428,14 +440,14 @@ public class ReservationService extends AdminServiceContainer implements IReserv
             final List<RoomArrangement> roomArrangements = this.roomArrangementDataSource
                 .findAvailableRooms(roomReservation, null, false, null, false, false);
 
-            if (roomArrangements.isEmpty()) {
+             if (roomArrangements.isEmpty()) {
                 // The room is not available. Report this through an exception.
 
                 /*
                  * KB 3049896 if the room is available for internal use (i.e. without attendees), we
                  * can indicate the room is not available specifically for external guests.
                  */
-                final boolean roomAvailableForInternal =
+                /* final boolean roomAvailableForInternal =
                         ReservationServiceHelper.checkRoomAvailableForInternalUse(roomReservation,
                             this.roomArrangementDataSource);
                 final RoomArrangement reservable =
@@ -446,7 +458,10 @@ public class ReservationService extends AdminServiceContainer implements IReserv
                 throw new ReservableNotAvailableException(reservable,
                     roomReservation.getReserveId(), errorMessage, ReservationService.class,
                     this.getAdminService(), reservable.getBlId(), reservable.getFlId(),
-                    reservable.getRmId());
+                    reservable.getRmId()); */
+                 /**
+                  * LBNL / BER
+                  **/
             }
         }
     }

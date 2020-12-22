@@ -434,4 +434,11 @@ public class ExchangeCalendarService implements ICalendarService {
         }
     }
 
+    /**lbnl - Brent Hopkins - send a cancel email to any attendees removed from a reservation **/
+    @Override
+    public void lbnlCancelCalendarEventHelp(RoomReservation reservation, RoomReservation origReserv, boolean allRecurrences, String message)
+            throws ExceptionBase {
+        return; //this should never be called
+    }
+
 }

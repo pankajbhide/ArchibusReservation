@@ -28,7 +28,10 @@ import com.archibus.utility.*;
 public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
     /** Constant: a single new line. */
-    private static final String NEWLINE = "   \n";
+    // private static final String NEWLINE = "   \n";
+    // Pankaj at LBNL
+    private static final String NEWLINE = "<BR>";
+
 
     /** Constant: reservation type room. */
     private static final String RES_TYPE_ROOM = "room";
@@ -37,7 +40,9 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
     private static final String SPACE = " ";
 
     /** Constant: a double newline. */
-    private static final String DOUBLE_NEWLINE = "\n\n";
+    //private static final String DOUBLE_NEWLINE = "\n\n";
+    // Pankaj at LBNL
+    private static final String DOUBLE_NEWLINE ="<BR><BR>";
 
     /** Constant: a dash surrounded by spaces. */
     private static final String DASH = " - ";
@@ -172,9 +177,9 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
         // notification rule error message
         final String errMessage = ReservationsContextHelper.localizeMessage(
-            NOTIFYREQUESTED_PREFIX + std.toUpperCase() + "_WFR",
-            ContextStore.get().getUser().getLocale(),
-            NOTIFYREQUESTED_PREFIX + std.toUpperCase() + "ERROR");
+                NOTIFYREQUESTED_PREFIX + std.toUpperCase() + "_WFR",
+                ContextStore.get().getUser().getLocale(),
+                NOTIFYREQUESTED_PREFIX + std.toUpperCase() + "ERROR");
 
         try {
             if (shouldSendNotification(std, resId, parentId)) {
@@ -182,30 +187,30 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                 retrieveUserInfo(std, resId, parentId, valuesToMail);
 
                 final DataSource reserveRoomDs = DataSourceFactory.createDataSourceForFields(
-                    Constants.RESERVE_RM_TABLE,
-                    new String[] { Constants.DATE_START_FIELD_NAME, Constants.TIME_START_FIELD_NAME,
-                            Constants.DATE_END_FIELD_NAME, Constants.TIME_END_FIELD_NAME,
-                            Constants.STATUS, Constants.BL_ID_FIELD_NAME,
-                            Constants.FL_ID_FIELD_NAME, Constants.RM_ID_FIELD_NAME,
-                            Constants.CONFIG_ID_FIELD_NAME, Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
-                            Constants.ATTENDEES_IN_ROOM_FIELD, COMMENTS_FIELD });
+                        Constants.RESERVE_RM_TABLE,
+                        new String[] { Constants.DATE_START_FIELD_NAME, Constants.TIME_START_FIELD_NAME,
+                                Constants.DATE_END_FIELD_NAME, Constants.TIME_END_FIELD_NAME,
+                                Constants.STATUS, Constants.BL_ID_FIELD_NAME,
+                                Constants.FL_ID_FIELD_NAME, Constants.RM_ID_FIELD_NAME,
+                                Constants.CONFIG_ID_FIELD_NAME, Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
+                                Constants.ATTENDEES_IN_ROOM_FIELD, COMMENTS_FIELD });
                 reserveRoomDs.addSort(Constants.DATE_START_FIELD_NAME);
                 if (ZERO.equals(resId)) {
                     reserveRoomDs.addRestriction(Restrictions
-                        .sql("reserve_rm.res_id IN (SELECT res_id FROM reserve WHERE res_parent = "
-                                + parentId + Constants.RIGHT_PAR));
+                            .sql("reserve_rm.res_id IN (SELECT res_id FROM reserve WHERE res_parent = "
+                                    + parentId + Constants.RIGHT_PAR));
                 } else {
                     reserveRoomDs.addRestriction(
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RES_ID, resId));
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RES_ID, resId));
                 }
                 final List<DataRecord> roomAllocations = reserveRoomDs.getRecords();
 
                 // if exists room reserve
                 if (roomAllocations.isEmpty()) {
                     isCancelled = Constants.STATUS_CANCELLED
-                        .equals(valuesToMail.get(RESERVE_DOT + Constants.STATUS));
+                            .equals(valuesToMail.get(RESERVE_DOT + Constants.STATUS));
                     isRejected = Constants.STATUS_REJECTED
-                        .equals(valuesToMail.get(RESERVE_DOT + Constants.STATUS));
+                            .equals(valuesToMail.get(RESERVE_DOT + Constants.STATUS));
                 } else {
                     existsRoom = true;
                     // For each room reservation, get the information to notify
@@ -231,17 +236,23 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                 String subject = "";
                 if (isRecurring) {
                     subject = compileRecurringSubject(parentId, valuesToMail, listResources,
-                        existsRoom, messages);
+                            existsRoom, messages);
                 } else if (isRegular) {
                     subject = compileRegularSubject(resId, valuesToMail, listResources, existsRoom,
-                        messages);
+                            messages);
                 }
                 // END: subject
 
                 // BEGIN: message
                 String message = "";
+
+                String strUserRequestedby=lblGetEmployeename(valuesToMail.get("reserve.user_requested_by"));
+                String strUserRequestedfor=lblGetEmployeename(valuesToMail.get("reserve.user_requested_for"));
+                System.out.println("by: "+strUserRequestedby+"\tfor:"+strUserRequestedfor);
                 message += messages.get("BODY1") + SPACE
-                        + valuesToMail.get("reserve.user_requested_" + std) + "," + DOUBLE_NEWLINE;
+                        + lblGetEmployeename(valuesToMail.get("reserve.user_requested_"+std)) + "," + DOUBLE_NEWLINE;
+
+
                 if (isCancelled) {
                     message += messages.get("BODY_PART2_CANCEL");
                 } else if (isRejected) {
@@ -249,7 +260,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                 } else {
                     message += messages.get("BODY2");
                 }
-                message += SPACE + (parentId.equals(ZERO) ? resId : parentId) + NEWLINE;
+                message += SPACE + (parentId.equals(ZERO) ? resId : parentId) + DOUBLE_NEWLINE; // Pankaj LBNL
 
                 if (existsRoom) {
                     message += compileRoomDetails(valuesToMail, listRoom, isRegular, messages);
@@ -280,11 +291,11 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
                 // END: Create message email
                 sendEmail(context, subject, message,
-                    valuesToMail.get("reserve.requested" + std + "mail"));
+                        valuesToMail.get("reserve.requested" + std + "mail"));
             }
         } catch (final ExceptionBase e) {
             handleNotificationError(context, ACTIVITY_ID + "-" + ruleId + ": Failed", errMessage, e,
-                "");
+                    "");
             allOk = false;
         }
 
@@ -293,6 +304,26 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         }
     }
 
+    // LBNL Pankaj- Get Employee name
+    private String lblGetEmployeename(String strEmid)
+    {
+        String strEmployeeName="";
+        String[] fields={"em.em_number","em.name"};
+        String[] tables={"em"};
+        DataSource ds=DataSourceFactory.createDataSourceForFields(tables,fields);
+
+
+        ds.addRestriction(Restrictions.eq("em","em_id",strEmid));
+        DataRecord record=ds.getRecord();
+        if (record != null)
+            //strEmployeeName=record.getString("em.em_number");
+            strEmployeeName=record.getString("em.name");
+        record=null;
+        ds=null;
+
+        return strEmployeeName;
+
+    }
     /**
      * Write resource details body fragment.
      *
@@ -303,7 +334,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return the fragment
      */
     private String compileResourceDetails(final List<Map<String, String>> listResources,
-            final boolean isRegular, final boolean existsRoom, final Map<String, String> messages) {
+                                          final boolean isRegular, final boolean existsRoom, final Map<String, String> messages) {
         String message = "";
 
         if (isRegular) {
@@ -375,27 +406,28 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return written room details
      */
     private String compileRoomDetails(final Map<String, String> valuesToMail,
-            final List<Map<String, String>> listRoom, final boolean isRegular,
-            final Map<String, String> messages) {
+                                      final List<Map<String, String>> listRoom, final boolean isRegular,
+                                      final Map<String, String> messages) {
         String message = "";
         if (isRegular) {
             message += messages.get("BODY3") + SPACE + valuesToMail.get("reserve_rm.bl_id") + DASH
                     + valuesToMail.get("reserve_rm.fl_id") + DASH
                     + valuesToMail.get("reserve_rm.rm_id") + DASH
                     + valuesToMail.get("reserve_rm.config_id") + DASH
-                    + valuesToMail.get("reserve_rm.rm_arrange_type_id") + NEWLINE;
+                    + valuesToMail.get("reserve_rm.rm_arrange_type_id") + DOUBLE_NEWLINE; // Pankaj LBNL
+
             message += messages.get("BODY14") + SPACE + valuesToMail.get("reserve_rm.date_start")
-                    + NEWLINE;
-            message += messages.get("BODY4") + SPACE + valuesToMail.get("reserve_rm.time_start")
-                    + NEWLINE;
+                    + DOUBLE_NEWLINE;  // Pankaj LBNL
+            message += messages.get("BODY4") + SPACE + convToStdTime(valuesToMail.get("reserve_rm.time_start"))
+                    + DOUBLE_NEWLINE; // Pankaj Bhide
             message += messages.get("BODY15") + SPACE + valuesToMail.get("reserve_rm.date_end")
-                    + NEWLINE;
-            message += messages.get("BODY5") + SPACE + valuesToMail.get("reserve_rm.time_end")
-                    + NEWLINE;
+                    + DOUBLE_NEWLINE; // Pankaj LBNL
+            message += messages.get("BODY5") + SPACE + convToStdTime(valuesToMail.get("reserve_rm.time_end"))
+                    + DOUBLE_NEWLINE; // Pankaj LBNL
             message += messages.get("BODY6") + SPACE
-                    + valuesToMail.get("reserve_rm.attendees_in_room") + NEWLINE;
+                    + valuesToMail.get("reserve_rm.attendees_in_room") + DOUBLE_NEWLINE; // Pankaj LBNL
             message +=
-                    messages.get("BODY7") + SPACE + valuesToMail.get("reserve_rm.status") + NEWLINE;
+                    messages.get("BODY7") + SPACE + valuesToMail.get("reserve_rm.status") + DOUBLE_NEWLINE; // Pankaj LBNL
             message += messages.get("BODY11") + SPACE
                     + valuesToMail.get("reserve_rm.comments").replaceAll("\n", NEWLINE)
                     + DOUBLE_NEWLINE;
@@ -407,8 +439,8 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                         + DASH + rooms.get("reserve_rm.fl_id") + DASH
                         + rooms.get("reserve_rm.rm_id") + DASH + rooms.get("reserve_rm.config_id")
                         + DASH + rooms.get("reserve_rm.rm_arrange_type_id") + DASH
-                        + rooms.get("reserve_rm.time_start") + DASH
-                        + rooms.get("reserve_rm.time_end") + DASH
+                        + convToStdTime(rooms.get("reserve_rm.time_start")) + DASH
+                        + convToStdTime(rooms.get("reserve_rm.time_end")) + DASH
                         + rooms.get("reserve_rm.attendees_in_room") + DASH
                         + rooms.get("reserve_rm.status") + NEWLINE;
                 rmComments = valuesToMail.get("reserve_rm.comments");
@@ -417,6 +449,21 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                     + rmComments.replaceAll("\n", NEWLINE) + DOUBLE_NEWLINE;
         }
         return message;
+    }
+
+    private String convToStdTime(String milTime) {
+        String stdTime = null;
+        int secIndex, minIndex;
+        secIndex = milTime.indexOf('.');
+        minIndex = milTime.indexOf(':');
+
+        int milHours = Integer.parseInt(milTime.substring(0, minIndex));
+        int stdHours = milHours <= 12 ? (milHours==0 ? 12 : milHours) : milHours-12;
+        int stdMin = Integer.parseInt(milTime.substring(minIndex+1, secIndex));
+        String stdMeridiem =  milHours < 12 ? "a.m." : "p.m.";
+        stdTime = Integer.toString(stdHours) + ":" + (stdMin<10 ? "0"+Integer.toString(stdMin) : Integer.toString(stdMin)) + " " + stdMeridiem;
+
+        return stdTime;
     }
 
     /**
@@ -428,38 +475,38 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return room allocation status
      */
     private String extractRoomInfo(final EventHandlerContext context,
-            final List<Map<String, String>> listRoom, final DataRecord record) {
+                                   final List<Map<String, String>> listRoom, final DataRecord record) {
         final Map<String, String> roomToMail = new HashMap<String, String>();
         roomToMail.put(RESERVE_RM_DOT + Constants.ATTENDEES_IN_ROOM_FIELD,
-            record.getNeutralValue(RESERVE_RM_DOT + Constants.ATTENDEES_IN_ROOM_FIELD));
+                record.getNeutralValue(RESERVE_RM_DOT + Constants.ATTENDEES_IN_ROOM_FIELD));
         roomToMail.put(RESERVE_RM_DOT + COMMENTS_FIELD,
-            StringUtil.notNull(record.getString(RESERVE_RM_DOT + COMMENTS_FIELD)));
+                StringUtil.notNull(record.getString(RESERVE_RM_DOT + COMMENTS_FIELD)));
 
         roomToMail.put(RESERVE_RM_DOT + Constants.DATE_START_FIELD_NAME,
-            record.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_START_FIELD_NAME));
+                record.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_START_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.TIME_START_FIELD_NAME,
-            record.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_START_FIELD_NAME));
+                record.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_START_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.DATE_END_FIELD_NAME,
-            record.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_END_FIELD_NAME));
+                record.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_END_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.TIME_END_FIELD_NAME,
-            record.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_END_FIELD_NAME));
+                record.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_END_FIELD_NAME));
 
         final String status = record.getString(RESERVE_RM_DOT + Constants.STATUS);
         final String dsiplayStatus = ContextStore.get().getProject()
-            .loadTableDef(Constants.RESERVE_RM_TABLE).findFieldDef(Constants.STATUS)
-            .formatFieldValue(status, null, true, context.getLocale());
+                .loadTableDef(Constants.RESERVE_RM_TABLE).findFieldDef(Constants.STATUS)
+                .formatFieldValue(status, null, true, context.getLocale());
         roomToMail.put(RESERVE_RM_DOT + Constants.STATUS, dsiplayStatus);
 
         roomToMail.put(RESERVE_RM_DOT + Constants.BL_ID_FIELD_NAME,
-            record.getString(RESERVE_RM_DOT + Constants.BL_ID_FIELD_NAME));
+                record.getString(RESERVE_RM_DOT + Constants.BL_ID_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.FL_ID_FIELD_NAME,
-            record.getString(RESERVE_RM_DOT + Constants.FL_ID_FIELD_NAME));
+                record.getString(RESERVE_RM_DOT + Constants.FL_ID_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.RM_ID_FIELD_NAME,
-            record.getString(RESERVE_RM_DOT + Constants.RM_ID_FIELD_NAME));
+                record.getString(RESERVE_RM_DOT + Constants.RM_ID_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.CONFIG_ID_FIELD_NAME,
-            record.getString(RESERVE_RM_DOT + Constants.CONFIG_ID_FIELD_NAME));
+                record.getString(RESERVE_RM_DOT + Constants.CONFIG_ID_FIELD_NAME));
         roomToMail.put(RESERVE_RM_DOT + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
-            record.getString(RESERVE_RM_DOT + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME));
+                record.getString(RESERVE_RM_DOT + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME));
         listRoom.add(roomToMail);
         return status;
     }
@@ -473,13 +520,14 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @param destination destination email address
      */
     private void sendEmail(final EventHandlerContext context, final String subject,
-            final String message, final String destination) {
+                           final String message, final String destination) {
         final MailMessage messageToLog = new MailMessage();
         messageToLog.setActivityId(ReservationsContextHelper.RESERVATIONS_ACTIVITY);
         messageToLog.setFrom(EmailNotificationHelper.getServiceEmail());
         messageToLog.setTo(destination);
         messageToLog.setSubject(subject);
         messageToLog.setText(message);
+        messageToLog.setContentType("text/html; charset=UTF-8");  // Pankaj LBNL
 
         messageToLog.setHost(EventHandlerBase.getEmailHost(context));
         messageToLog.setPort(EventHandlerBase.getEmailPort(context));
@@ -500,12 +548,14 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return the email subject
      */
     private String compileRegularSubject(final String resId, final Map<String, String> valuesToMail,
-            final List<Map<String, String>> listResources, final boolean existsRoom,
-            final Map<String, String> messages) {
+                                         final List<Map<String, String>> listResources, final boolean existsRoom,
+                                         final Map<String, String> messages) {
         String subject =
                 messages.get("SUBJECT1") + SPACE + resId + ", " + messages.get("SUBJECT2") + SPACE;
         if (existsRoom) {
             subject += valuesToMail.get("reserve_rm.date_start");
+            subject += SPACE + "is" + SPACE + valuesToMail.get("reserve_rm.status");  // Pankaj LBNL
+
         } else if (listResources.isEmpty()) {
             subject += valuesToMail.get("reserve.date_start");
         } else {
@@ -528,8 +578,8 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return the email subject
      */
     private String compileRecurringSubject(final String parentId,
-            final Map<String, String> valuesToMail, final List<Map<String, String>> listResources,
-            final boolean existsRoom, final Map<String, String> messages) {
+                                           final Map<String, String> valuesToMail, final List<Map<String, String>> listResources,
+                                           final boolean existsRoom, final Map<String, String> messages) {
         String subject = messages.get("SUBJECT1") + SPACE + parentId + ", "
                 + messages.get("SUBJECT2") + SPACE;
         if (existsRoom) {
@@ -555,14 +605,14 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @param listResources the list to add the resource information to
      */
     private void retrieveResourcesToMail(final EventHandlerContext context, final String resId,
-            final String parentId, final List<Map<String, String>> listResources) {
+                                         final String parentId, final List<Map<String, String>> listResources) {
         final DataSource reserveResourceDs =
                 DataSourceFactory.createDataSourceForFields(Constants.RESERVE_RS_TABLE,
-                    new String[] { Constants.DATE_START_FIELD_NAME, Constants.TIME_START_FIELD_NAME,
-                            Constants.DATE_END_FIELD_NAME, Constants.TIME_END_FIELD_NAME,
-                            Constants.STATUS, Constants.RESOURCE_ID_FIELD, Constants.QUANTITY_FIELD,
-                            Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
-                            Constants.RM_ID_FIELD_NAME, COMMENTS_FIELD });
+                        new String[] { Constants.DATE_START_FIELD_NAME, Constants.TIME_START_FIELD_NAME,
+                                Constants.DATE_END_FIELD_NAME, Constants.TIME_END_FIELD_NAME,
+                                Constants.STATUS, Constants.RESOURCE_ID_FIELD, Constants.QUANTITY_FIELD,
+                                Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
+                                Constants.RM_ID_FIELD_NAME, COMMENTS_FIELD });
         reserveResourceDs.addSort(Constants.DATE_START_FIELD_NAME);
 
         // if resId is not zero makes the query for a single a reserve,
@@ -572,10 +622,10 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
             // Since we don't show the dates, only show the resources for one
             // date.
             reserveResourceDs.addRestriction(
-                Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RES_ID, parentId));
+                    Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RES_ID, parentId));
         } else {
             reserveResourceDs.addRestriction(
-                Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RES_ID, resId));
+                    Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RES_ID, resId));
         }
 
         final List<DataRecord> resourceAllocations = reserveResourceDs.getRecords();
@@ -583,32 +633,32 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
             for (final DataRecord record : resourceAllocations) {
                 final Map<String, String> resourcesToMail = new HashMap<String, String>();
                 resourcesToMail.put(RESERVE_RS_DOT + COMMENTS_FIELD,
-                    StringUtil.notNull(record.getString(RESERVE_RS_DOT + COMMENTS_FIELD)));
+                        StringUtil.notNull(record.getString(RESERVE_RS_DOT + COMMENTS_FIELD)));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.DATE_START_FIELD_NAME,
-                    record.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_START_FIELD_NAME));
+                        record.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_START_FIELD_NAME));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.TIME_START_FIELD_NAME,
-                    record.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_START_FIELD_NAME));
+                        record.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_START_FIELD_NAME));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.DATE_END_FIELD_NAME,
-                    record.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_END_FIELD_NAME));
+                        record.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_END_FIELD_NAME));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.TIME_END_FIELD_NAME,
-                    record.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_END_FIELD_NAME));
+                        record.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_END_FIELD_NAME));
 
                 final String status = record.getString(RESERVE_RS_DOT + Constants.STATUS);
                 final String displayStatus = ContextStore.get().getProject()
-                    .loadTableDef(Constants.RESERVE_RS_TABLE).findFieldDef(Constants.STATUS)
-                    .formatFieldValue(status, null, true, context.getLocale());
+                        .loadTableDef(Constants.RESERVE_RS_TABLE).findFieldDef(Constants.STATUS)
+                        .formatFieldValue(status, null, true, context.getLocale());
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.STATUS, displayStatus);
 
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.RESOURCE_ID_FIELD,
-                    record.getString(RESERVE_RS_DOT + Constants.RESOURCE_ID_FIELD));
+                        record.getString(RESERVE_RS_DOT + Constants.RESOURCE_ID_FIELD));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.QUANTITY_FIELD,
-                    record.getNeutralValue(RESERVE_RS_DOT + Constants.QUANTITY_FIELD));
+                        record.getNeutralValue(RESERVE_RS_DOT + Constants.QUANTITY_FIELD));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.BL_ID_FIELD_NAME,
-                    record.getString(RESERVE_RS_DOT + Constants.BL_ID_FIELD_NAME));
+                        record.getString(RESERVE_RS_DOT + Constants.BL_ID_FIELD_NAME));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.FL_ID_FIELD_NAME,
-                    record.getString(RESERVE_RS_DOT + Constants.FL_ID_FIELD_NAME));
+                        record.getString(RESERVE_RS_DOT + Constants.FL_ID_FIELD_NAME));
                 resourcesToMail.put(RESERVE_RS_DOT + Constants.RM_ID_FIELD_NAME,
-                    record.getString(RESERVE_RS_DOT + Constants.RM_ID_FIELD_NAME));
+                        record.getString(RESERVE_RS_DOT + Constants.RM_ID_FIELD_NAME));
                 listResources.add(resourcesToMail);
             }
         }
@@ -623,40 +673,40 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @param valuesToMail container to store the information
      */
     private void retrieveUserInfo(final String std, final String resId, final String parentId,
-            final Map<String, String> valuesToMail) {
+                                  final Map<String, String> valuesToMail) {
         final DataSource emailDs = DataSourceFactory.createDataSourceForFields(
-            Constants.RESERVE_TABLE_NAME, new String[] { Constants.RES_ID, USER_REQ_PREFIX + std,
-                    COMMENTS_FIELD, Constants.DATE_START_FIELD_NAME, Constants.STATUS });
+                Constants.RESERVE_TABLE_NAME, new String[] { Constants.RES_ID, USER_REQ_PREFIX + std,
+                        COMMENTS_FIELD, Constants.DATE_START_FIELD_NAME, Constants.STATUS });
         emailDs.addTable(Constants.EM_TABLE_NAME);
         emailDs.addField(Constants.EM_TABLE_NAME, Constants.EMAIL_FIELD_NAME);
         emailDs
-            .addRestriction(Restrictions.sql(RESERVE_DOT + USER_REQ_PREFIX + std + " = em.em_id"));
+                .addRestriction(Restrictions.sql(RESERVE_DOT + USER_REQ_PREFIX + std + " = em.em_id"));
         // if resId is not zero makes the query for a single a reserve,
         // but in another case makes it for a group of reserves with a common father.
         if (resId.equals(ZERO)) {
             emailDs.addRestriction(
-                Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_PARENT, parentId));
+                    Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_PARENT, parentId));
         } else {
             emailDs.addRestriction(
-                Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_ID, resId));
+                    Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_ID, resId));
         }
         final DataRecord mailRecord = emailDs.getRecord();
         if (mailRecord != null) {
             valuesToMail.put("reserve.requested" + std + "mail", mailRecord.getString("em.email"));
             valuesToMail.put(RESERVE_DOT + Constants.RES_ID,
-                mailRecord.getNeutralValue(RESERVE_DOT + Constants.RES_ID));
+                    mailRecord.getNeutralValue(RESERVE_DOT + Constants.RES_ID));
             valuesToMail.put("reserve.user_requested_" + std,
-                mailRecord.getString("reserve.user_requested_" + std));
+                    mailRecord.getString("reserve.user_requested_" + std));
             valuesToMail.put(RESERVE_DOT + "comments",
-                StringUtil.notNull(mailRecord.getString(RESERVE_DOT + "comments")));
+                    StringUtil.notNull(mailRecord.getString(RESERVE_DOT + "comments")));
             valuesToMail.put(RESERVE_DOT + Constants.STATUS,
-                mailRecord.getString(RESERVE_DOT + Constants.STATUS));
+                    mailRecord.getString(RESERVE_DOT + Constants.STATUS));
             valuesToMail.put(RESERVE_DOT + Constants.DATE_START_FIELD_NAME,
-                mailRecord.getNeutralValue(RESERVE_DOT + Constants.DATE_START_FIELD_NAME));
+                    mailRecord.getNeutralValue(RESERVE_DOT + Constants.DATE_START_FIELD_NAME));
 
             // Search the locale of the user to notify
             valuesToMail.put(LOCALE, EmailNotificationHelper
-                .getUserLocale(valuesToMail.get("reserve.requested" + std + "mail")));
+                    .getUserLocale(valuesToMail.get("reserve.requested" + std + "mail")));
         }
 
         // In case that we haven't found the locale to use in the email, we'll
@@ -675,7 +725,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return true if notification should be sent, false otherwise
      */
     private boolean shouldSendNotification(final String std, final String resId,
-            final String parentId) {
+                                           final String parentId) {
 
         boolean sendNotification = true;
 
@@ -685,20 +735,20 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
             // check if requested for and requested by are the same
             final DataSource reserveDs =
                     DataSourceFactory.createDataSourceForFields(Constants.RESERVE_TABLE_NAME,
-                        new String[] { USER_REQUESTED_BY, USER_REQUESTED_FOR });
+                            new String[] { USER_REQUESTED_BY, USER_REQUESTED_FOR });
             if (resId.equals(ZERO)) {
                 reserveDs.addRestriction(
-                    Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_PARENT, parentId));
+                        Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_PARENT, parentId));
             } else {
                 reserveDs.addRestriction(
-                    Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_ID, resId));
+                        Restrictions.eq(Constants.RESERVE_TABLE_NAME, Constants.RES_ID, resId));
             }
 
             final DataRecord record = reserveDs.getRecord();
             if (record != null && record
-                .getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_BY)
-                .equals(record.getString(
-                    Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR))) {
+                    .getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_BY)
+                    .equals(record.getString(
+                            Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR))) {
                 sendNotification = false;
             }
         }
@@ -755,14 +805,14 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                 && !StringUtil.isNullOrEmpty(roomId)) {
             final DataSource roomDs =
                     DataSourceFactory.createDataSourceForFields(Constants.ROOM_TABLE,
-                        new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
-                                Constants.RM_ID_FIELD_NAME, Constants.RESERVABLE_FIELD_NAME });
+                            new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
+                                    Constants.RM_ID_FIELD_NAME, Constants.RESERVABLE_FIELD_NAME });
             roomDs.addRestriction(
-                Restrictions.eq(Constants.ROOM_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
+                    Restrictions.eq(Constants.ROOM_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
             roomDs.addRestriction(
-                Restrictions.eq(Constants.ROOM_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
+                    Restrictions.eq(Constants.ROOM_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
             roomDs.addRestriction(
-                Restrictions.eq(Constants.ROOM_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
+                    Restrictions.eq(Constants.ROOM_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
 
             final DataRecord roomRecord = roomDs.getRecord();
             roomRecord.setValue("rm.reservable", reservable);
@@ -773,9 +823,9 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
                         createConfigurationRecord(buildingId, floorId, roomId, roomName);
                 if (configRecord != null) {
                     createArrangementRecord(buildingId, floorId, roomId,
-                        configRecord.getString(Constants.ROOM_CONFIG_TABLE + Constants.DOT
-                                + Constants.CONFIG_ID_FIELD_NAME),
-                        "CONFERENCE");
+                            configRecord.getString(Constants.ROOM_CONFIG_TABLE + Constants.DOT
+                                    + Constants.CONFIG_ID_FIELD_NAME),
+                            "CONFERENCE");
                 }
 
             }
@@ -792,19 +842,19 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return existing configuration record or the new inserted one.
      */
     public DataRecord createConfigurationRecord(final String buildingId, final String floorId,
-            final String roomId, final String roomName) {
+                                                final String roomId, final String roomName) {
         // Check that one configuration for the room doesn't exist first
         final DataSource configDs =
                 DataSourceFactory.createDataSourceForFields(Constants.ROOM_CONFIG_TABLE,
-                    new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
-                            Constants.RM_ID_FIELD_NAME, Constants.CONFIG_ID_FIELD_NAME,
-                            "config_name" });
+                        new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
+                                Constants.RM_ID_FIELD_NAME, Constants.CONFIG_ID_FIELD_NAME,
+                                "config_name" });
         configDs.addRestriction(
-            Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
+                Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
         configDs.addRestriction(
-            Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
+                Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
         configDs.addRestriction(
-            Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
+                Restrictions.eq(Constants.ROOM_CONFIG_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
 
         DataRecord resultRecord = configDs.getRecord();
         // If not exists, create the configuration
@@ -832,29 +882,29 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return existing arrangement record or the new inserted one.
      */
     public DataRecord createArrangementRecord(final String buildingId, final String floorId,
-            final String roomId, final String configId, final String rmArrangeTypeId) {
+                                              final String roomId, final String configId, final String rmArrangeTypeId) {
         // Check that one arrangement for the room doesn't exist first
         final DataSource arrangeDs =
                 DataSourceFactory.createDataSourceForFields(Constants.RM_ARRANGE_TABLE,
-                    new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
-                            Constants.RM_ID_FIELD_NAME, Constants.CONFIG_ID_FIELD_NAME,
-                            Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
-                            Constants.DAY_END_FIELD_NAME, Constants.DAY_START_FIELD_NAME,
-                            Constants.IS_DEFAULT_FIELD_NAME, Constants.RESERVABLE_FIELD_NAME,
-                            Constants.CANCEL_TIME_FIELD_NAME, Constants.MAX_CAPACITY_FIELD_NAME,
-                            Constants.ANNOUNCE_TIME_FIELD_NAME, Constants.MAX_DAYS_AHEAD_FIELD_NAME,
-                            Constants.EXTERNAL_ALLOWED_FIELD_NAME });
+                        new String[] { Constants.BL_ID_FIELD_NAME, Constants.FL_ID_FIELD_NAME,
+                                Constants.RM_ID_FIELD_NAME, Constants.CONFIG_ID_FIELD_NAME,
+                                Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
+                                Constants.DAY_END_FIELD_NAME, Constants.DAY_START_FIELD_NAME,
+                                Constants.IS_DEFAULT_FIELD_NAME, Constants.RESERVABLE_FIELD_NAME,
+                                Constants.CANCEL_TIME_FIELD_NAME, Constants.MAX_CAPACITY_FIELD_NAME,
+                                Constants.ANNOUNCE_TIME_FIELD_NAME, Constants.MAX_DAYS_AHEAD_FIELD_NAME,
+                                Constants.EXTERNAL_ALLOWED_FIELD_NAME });
 
         arrangeDs.addRestriction(
-            Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
+                Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.BL_ID_FIELD_NAME, buildingId));
         arrangeDs.addRestriction(
-            Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
+                Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.FL_ID_FIELD_NAME, floorId));
         arrangeDs.addRestriction(
-            Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
+                Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.RM_ID_FIELD_NAME, roomId));
         arrangeDs.addRestriction(
-            Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.CONFIG_ID_FIELD_NAME, configId));
+                Restrictions.eq(Constants.RM_ARRANGE_TABLE, Constants.CONFIG_ID_FIELD_NAME, configId));
         arrangeDs.addRestriction(Restrictions.eq(Constants.RM_ARRANGE_TABLE,
-            Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, rmArrangeTypeId));
+                Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, rmArrangeTypeId));
 
         DataRecord resultRecord = arrangeDs.getRecord();
         // If not exists, create the arrangement
@@ -862,18 +912,18 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
             final DataRecord arrangeRecord = arrangeDs.createNewRecord();
             arrangeRecord.setValue(
-                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.BL_ID_FIELD_NAME,
-                buildingId);
+                    Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.BL_ID_FIELD_NAME,
+                    buildingId);
             arrangeRecord.setValue(
-                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.FL_ID_FIELD_NAME, floorId);
+                    Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.FL_ID_FIELD_NAME, floorId);
             arrangeRecord.setValue(
-                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.RM_ID_FIELD_NAME, roomId);
+                    Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.RM_ID_FIELD_NAME, roomId);
             arrangeRecord.setValue(
-                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.CONFIG_ID_FIELD_NAME,
-                configId);
+                    Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.CONFIG_ID_FIELD_NAME,
+                    configId);
             arrangeRecord.setValue(Constants.RM_ARRANGE_TABLE + Constants.DOT
-                    + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
-                rmArrangeTypeId);
+                            + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
+                    rmArrangeTypeId);
             setDefaultValuesForArrangementRecord(arrangeRecord);
             resultRecord = arrangeDs.saveRecord(arrangeRecord);
         }
@@ -900,29 +950,29 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         final Time timelineEndTime = new Time(cal.getTimeInMillis());
 
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.DAY_END_FIELD_NAME,
-            timelineEndTime);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.DAY_END_FIELD_NAME,
+                timelineEndTime);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.DAY_START_FIELD_NAME,
-            timelineStartTime);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.DAY_START_FIELD_NAME,
+                timelineStartTime);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.IS_DEFAULT_FIELD_NAME, 1);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.IS_DEFAULT_FIELD_NAME, 1);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.RESERVABLE_FIELD_NAME, 1);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.RESERVABLE_FIELD_NAME, 1);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.CANCEL_TIME_FIELD_NAME,
-            timelineEndTime);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.CANCEL_TIME_FIELD_NAME,
+                timelineEndTime);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.MAX_CAPACITY_FIELD_NAME,
-            DEFAULT_MAX_CAPACITY);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.MAX_CAPACITY_FIELD_NAME,
+                DEFAULT_MAX_CAPACITY);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.ANNOUNCE_TIME_FIELD_NAME,
-            timelineEndTime);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.ANNOUNCE_TIME_FIELD_NAME,
+                timelineEndTime);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.MAX_DAYS_AHEAD_FIELD_NAME,
-            DEFAULT_MAX_DAYS_AHEAD);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.MAX_DAYS_AHEAD_FIELD_NAME,
+                DEFAULT_MAX_DAYS_AHEAD);
         arrangeRecord.setValue(
-            Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.EXTERNAL_ALLOWED_FIELD_NAME, 1);
+                Constants.RM_ARRANGE_TABLE + Constants.DOT + Constants.EXTERNAL_ALLOWED_FIELD_NAME, 1);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -945,78 +995,78 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         try {
             final JSONObject roomResourceStandard = new JSONObject(rmResourceStd + ")");
             SqlUtils.executeUpdate("rm_resource_std",
-                "UPDATE rm_resource_std SET resource_std = "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("resource_std"))
-                        + ", eq_id = "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("eq_id"))
-                        + ", description = "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("description"))
-                        + " WHERE bl_id = "
-                        + SqlUtils.formatValueForSql(
+                    "UPDATE rm_resource_std SET resource_std = "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("resource_std"))
+                            + ", eq_id = "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("eq_id"))
+                            + ", description = "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("description"))
+                            + " WHERE bl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.BL_ID_FIELD_NAME))
-                        + " AND fl_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND fl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.FL_ID_FIELD_NAME))
-                        + " AND rm_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND rm_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.RM_ID_FIELD_NAME))
-                        + " AND config_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND config_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.CONFIG_ID_FIELD_NAME))
-                        + " AND fixed_resource_id = " + SqlUtils.formatValueForSql(
+                            + " AND fixed_resource_id = " + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString("fixed_resource_id")));
 
             SqlUtils.executeUpdate("rm_resource_std",
-                "INSERT INTO rm_resource_std (rm_arrange_type_id, bl_id, fl_id, rm_id, config_id, fixed_resource_id, resource_std, eq_id, description) "
-                        + " SELECT a.rm_arrange_type_id AS rm_arrange_type_id, "
-                        + SqlUtils.formatValueForSql(
+                    "INSERT INTO rm_resource_std (rm_arrange_type_id, bl_id, fl_id, rm_id, config_id, fixed_resource_id, resource_std, eq_id, description) "
+                            + " SELECT a.rm_arrange_type_id AS rm_arrange_type_id, "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.BL_ID_FIELD_NAME))
-                        + " AS bl_id, "
-                        + SqlUtils.formatValueForSql(
+                            + " AS bl_id, "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.FL_ID_FIELD_NAME))
-                        + " AS fl_id, "
-                        + SqlUtils.formatValueForSql(
+                            + " AS fl_id, "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.RM_ID_FIELD_NAME))
-                        + " AS rm_id, "
-                        + SqlUtils.formatValueForSql(
+                            + " AS rm_id, "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.CONFIG_ID_FIELD_NAME))
-                        + " AS config_id, "
-                        + SqlUtils
+                            + " AS config_id, "
+                            + SqlUtils
                             .formatValueForSql(roomResourceStandard.getString("fixed_resource_id"))
-                        + " AS fixed_resource_id, "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("resource_std"))
-                        + " AS resource_std, "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("eq_id"))
-                        + " AS eq_id, "
-                        + SqlUtils.formatValueForSql(roomResourceStandard.getString("description"))
-                        + " AS description FROM rm_arrange a WHERE a.bl_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AS fixed_resource_id, "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("resource_std"))
+                            + " AS resource_std, "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("eq_id"))
+                            + " AS eq_id, "
+                            + SqlUtils.formatValueForSql(roomResourceStandard.getString("description"))
+                            + " AS description FROM rm_arrange a WHERE a.bl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.BL_ID_FIELD_NAME))
-                        + " AND a.fl_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND a.fl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.FL_ID_FIELD_NAME))
-                        + " AND a.rm_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND a.rm_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.RM_ID_FIELD_NAME))
-                        + " AND a.config_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND a.config_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.CONFIG_ID_FIELD_NAME))
-                        + " AND NOT EXISTS (SELECT 1 FROM rm_resource_std b WHERE b.bl_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND NOT EXISTS (SELECT 1 FROM rm_resource_std b WHERE b.bl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.BL_ID_FIELD_NAME))
-                        + " AND b.fl_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND b.fl_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.FL_ID_FIELD_NAME))
-                        + " AND b.rm_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND b.rm_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.RM_ID_FIELD_NAME))
-                        + " AND b.config_id = "
-                        + SqlUtils.formatValueForSql(
+                            + " AND b.config_id = "
+                            + SqlUtils.formatValueForSql(
                             roomResourceStandard.getString(Constants.CONFIG_ID_FIELD_NAME))
-                        + " AND b.fixed_resource_id = "
-                        + SqlUtils
+                            + " AND b.fixed_resource_id = "
+                            + SqlUtils
                             .formatValueForSql(roomResourceStandard.getString("fixed_resource_id"))
-                        + " AND b.rm_arrange_type_id = a.rm_arrange_type_id)");
+                            + " AND b.rm_arrange_type_id = a.rm_arrange_type_id)");
         } catch (final ParseException exception) {
             throw new ExceptionBase("Parsing JSON expression failed", exception);
         }
@@ -1041,7 +1091,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         // First of all the system must get the DaysBeforeArchiving value to
         // take into account in the process from the reservation parameters table
         final int daysBeforeArchiving = Configuration.getActivityParameterInt(
-            ReservationsContextHelper.RESERVATIONS_ACTIVITY, "DaysBeforeArchiving", 0);
+                ReservationsContextHelper.RESERVATIONS_ACTIVITY, "DaysBeforeArchiving", 0);
 
         if (daysBeforeArchiving > 0) {
             // BEGIN: Move to HRESERVE_RM historical table
@@ -1050,24 +1100,24 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
             // Remove the inserted reservations into the historical table from
             // the original table
             SqlUtils.executeUpdate("reserve_rm",
-                "DELETE FROM reserve_rm WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
-                        + SqlUtils.formatValueForSql(daysBeforeArchiving));
+                    "DELETE FROM reserve_rm WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
+                            + SqlUtils.formatValueForSql(daysBeforeArchiving));
             // END: Move to HRESERVE_RM historical table
 
             // BEGIN: Move to HRESERVE_RS historical table
             SqlUtils.executeUpdate("hreserve_rs", buildSqlToArchiveReserveRs(daysBeforeArchiving));
             setArchiveStatus("hreserve_rs");
             SqlUtils.executeUpdate("reserve_rs",
-                "DELETE FROM reserve_rs WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
-                        + SqlUtils.formatValueForSql(daysBeforeArchiving));
+                    "DELETE FROM reserve_rs WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
+                            + SqlUtils.formatValueForSql(daysBeforeArchiving));
             // END: Move to HRESERVE_RS historical table
 
             // BEGIN: Move to HRESERVE historical table
             SqlUtils.executeUpdate("hreserve", buildSqlToArchiveReserve(daysBeforeArchiving));
             setArchiveStatus("hreserve");
             SqlUtils.executeUpdate(Constants.RESERVE_TABLE_NAME,
-                "DELETE FROM reserve WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
-                        + SqlUtils.formatValueForSql(daysBeforeArchiving));
+                    "DELETE FROM reserve WHERE ${sql.daysBeforeCurrentDate('date_start')} >= "
+                            + SqlUtils.formatValueForSql(daysBeforeArchiving));
             // END: Move to HRESERVE historical table
         }
     }
@@ -1165,7 +1215,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return comma-separated list of fieldNames that exist in the given table
      */
     private static String addNewFieldsToArchive(final TableDef.ThreadSafe tableDef,
-            final String[] fieldNames) {
+                                                final String[] fieldNames) {
 
         String sql = "";
         for (final String fieldName : fieldNames) {
@@ -1202,11 +1252,11 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
         final JSONObject timelineLimits = new JSONObject();
         timelineLimits.put("TimelineStartTime",
-            String.format("%02d", timelineHours.getInt(TimelineHelper.JSON_TIMELINE_START_HOUR))
-                    + ":00.00");
+                String.format("%02d", timelineHours.getInt(TimelineHelper.JSON_TIMELINE_START_HOUR))
+                        + ":00.00");
         timelineLimits.put("TimelineEndTime",
-            String.format("%02d", timelineHours.getInt(TimelineHelper.JSON_TIMELINE_END_HOUR))
-                    + ":00.00");
+                String.format("%02d", timelineHours.getInt(TimelineHelper.JSON_TIMELINE_END_HOUR))
+                        + ":00.00");
 
         context.addResponseParameter("jsonExpression", timelineLimits.toString());
     }
@@ -1237,7 +1287,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         // getNumberPendingReservations rule error message
         final String errMessage =
                 ReservationsContextHelper.localizeMessage("GETNUMBERPENDINGRESERVATIONS_WFR",
-                    ContextStore.get().getUser().getLocale(), "GETNUMBERPENDINGRESERVATIONSERROR");
+                        ContextStore.get().getUser().getLocale(), "GETNUMBERPENDINGRESERVATIONSERROR");
 
         if (record != null) {
             // obtain room primary key values and the reservable field
@@ -1252,23 +1302,23 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         if (!("".equals(blId) || "".equals(flId) || "".equals(rmId) || "".equals(configId)
                 || "".equals(rmArrangeTypeId)) && (reservable == 0)) {
             final Restriction restriction = Restrictions
-                .and(new com.archibus.datasource.restriction.Restrictions.Restriction.Clause[] {
-                        Restrictions.ne(Constants.RESERVE_RM_TABLE, Constants.STATUS,
-                            Constants.STATUS_CANCELLED),
-                        Restrictions.ne(Constants.RESERVE_RM_TABLE, Constants.STATUS,
-                            Constants.STATUS_REJECTED),
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.BL_ID_FIELD_NAME,
-                            blId),
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.FL_ID_FIELD_NAME,
-                            flId),
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RM_ID_FIELD_NAME,
-                            rmId),
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.CONFIG_ID_FIELD_NAME,
-                            configId),
-                        Restrictions.eq(Constants.RESERVE_RM_TABLE,
-                            Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, rmArrangeTypeId) });
+                    .and(new com.archibus.datasource.restriction.Restrictions.Restriction.Clause[] {
+                            Restrictions.ne(Constants.RESERVE_RM_TABLE, Constants.STATUS,
+                                    Constants.STATUS_CANCELLED),
+                            Restrictions.ne(Constants.RESERVE_RM_TABLE, Constants.STATUS,
+                                    Constants.STATUS_REJECTED),
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.BL_ID_FIELD_NAME,
+                                    blId),
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.FL_ID_FIELD_NAME,
+                                    flId),
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RM_ID_FIELD_NAME,
+                                    rmId),
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.CONFIG_ID_FIELD_NAME,
+                                    configId),
+                            Restrictions.eq(Constants.RESERVE_RM_TABLE,
+                                    Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME, rmArrangeTypeId) });
             final int pending = DataStatistics.getInt(Constants.RESERVE_RM_TABLE,
-                Constants.RMRES_ID_FIELD_NAME, "count", restriction);
+                    Constants.RMRES_ID_FIELD_NAME, "count", restriction);
             final JSONObject pendingReservations = new JSONObject();
             pendingReservations.put("numberPendingRes", String.valueOf(pending));
             context.addResponseParameter("jsonExpression", pendingReservations.toString());
@@ -1296,8 +1346,8 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
         // getNumberPendingResourceReservations rule error message
         final String errMessage = ReservationsContextHelper.localizeMessage(
-            "GETNUMBERPENDINGRESOURCERESERVATIONS_WFR", ContextStore.get().getUser().getLocale(),
-            "GETNUMBERPENDINGRESOURCERESERVATIONSERROR");
+                "GETNUMBERPENDINGRESOURCERESERVATIONS_WFR", ContextStore.get().getUser().getLocale(),
+                "GETNUMBERPENDINGRESOURCERESERVATIONSERROR");
 
         if (record != null) {
             // obtain resource primary key values and the reservable field
@@ -1307,15 +1357,15 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
         if (!"".equals(resourceId) && reservable == 0) {
             final Restriction restriction = Restrictions
-                .and(new com.archibus.datasource.restriction.Restrictions.Restriction.Clause[] {
-                        Restrictions.ne(Constants.RESERVE_RS_TABLE, Constants.STATUS,
-                            Constants.STATUS_CANCELLED),
-                        Restrictions.ne(Constants.RESERVE_RS_TABLE, Constants.STATUS,
-                            Constants.STATUS_REJECTED),
-                        Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RESOURCE_ID_FIELD,
-                            resourceId) });
+                    .and(new com.archibus.datasource.restriction.Restrictions.Restriction.Clause[] {
+                            Restrictions.ne(Constants.RESERVE_RS_TABLE, Constants.STATUS,
+                                    Constants.STATUS_CANCELLED),
+                            Restrictions.ne(Constants.RESERVE_RS_TABLE, Constants.STATUS,
+                                    Constants.STATUS_REJECTED),
+                            Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RESOURCE_ID_FIELD,
+                                    resourceId) });
             final int pending = DataStatistics.getInt(Constants.RESERVE_RS_TABLE,
-                Constants.RSRES_ID_FIELD_NAME, "count", restriction);
+                    Constants.RSRES_ID_FIELD_NAME, "count", restriction);
             final JSONObject pendingReservations = new JSONObject();
             pendingReservations.put("numberPendingRes", String.valueOf(pending));
             context.addResponseParameter("jsonExpression", pendingReservations.toString());
@@ -1352,7 +1402,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
 
         // notification rule error message
         final String errMessage = ReservationsContextHelper.localizeMessage(NOTIFYAPPROVER_WFR,
-            ContextStore.get().getUser().getLocale(), "NOTIFYAPPROVERERROR");
+                ContextStore.get().getUser().getLocale(), "NOTIFYAPPROVERERROR");
 
         try {
 
@@ -1464,13 +1514,13 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return the date end or an empty string
      */
     private String includeEndDate(final String resType, final Map<String, String> valuesToMail,
-            final Map<String, String> messages) {
+                                  final Map<String, String> messages) {
         String endDateLine = "";
         if (RES_TYPE_ROOM.equals(resType)
                 && SchemaUtils.fieldExistsInSchema(Constants.RESERVE_RM_TABLE,
-                    Constants.DATE_END_FIELD_NAME)
+                Constants.DATE_END_FIELD_NAME)
                 || SchemaUtils.fieldExistsInSchema(Constants.RESERVE_RS_TABLE,
-                    Constants.DATE_END_FIELD_NAME)) {
+                Constants.DATE_END_FIELD_NAME)) {
             endDateLine += messages.get("BODY18") + SPACE
                     + valuesToMail.get(Constants.DATE_END_FIELD_NAME) + NEWLINE;
         }
@@ -1491,7 +1541,7 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
         }
         // localize all in a single query
         final Map<String, String> longMessages = ReservationsContextHelper.localizeMessages(
-            NOTIFYAPPROVER_WFR, locale, messageIds.values().toArray(new String[messageIds.size()]));
+                NOTIFYAPPROVER_WFR, locale, messageIds.values().toArray(new String[messageIds.size()]));
         // map back to the short id's used below
         final Map<String, String> messages = new HashMap<String, String>();
         for (final String messageId : messageIds.keySet()) {
@@ -1508,39 +1558,39 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return true if the info was found, false if nothing was found
      */
     private boolean retrieveResourceInfo(final String rmrsResId,
-            final Map<String, String> valuesToMail) {
+                                         final Map<String, String> valuesToMail) {
         boolean allQueriesOk = false;
         // Get resource reservation info if it's a resource
         // reservation
         final DataSource reserveResourceDs =
                 DataSourceFactory.createDataSourceForFields(Constants.RESERVE_RS_TABLE,
-                    new String[] { Constants.RSRES_ID_FIELD_NAME, Constants.DATE_START_FIELD_NAME,
-                            Constants.TIME_START_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
-                            Constants.TIME_END_FIELD_NAME, Constants.RESOURCE_ID_FIELD,
-                            Constants.QUANTITY_FIELD });
+                        new String[] { Constants.RSRES_ID_FIELD_NAME, Constants.DATE_START_FIELD_NAME,
+                                Constants.TIME_START_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
+                                Constants.TIME_END_FIELD_NAME, Constants.RESOURCE_ID_FIELD,
+                                Constants.QUANTITY_FIELD });
         reserveResourceDs.addTable(Constants.RESERVE_TABLE_NAME, DataSource.ROLE_STANDARD);
         reserveResourceDs.addField(Constants.RESERVE_TABLE_NAME, USER_REQUESTED_FOR);
         reserveResourceDs.addRestriction(
-            Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RSRES_ID_FIELD_NAME, rmrsResId));
+                Restrictions.eq(Constants.RESERVE_RS_TABLE, Constants.RSRES_ID_FIELD_NAME, rmrsResId));
 
         final DataRecord alloc = reserveResourceDs.getRecord();
         if (alloc != null) {
             valuesToMail.put(Constants.RSRES_ID_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.RSRES_ID_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.RSRES_ID_FIELD_NAME));
             valuesToMail.put(USER_REQUESTED_FOR,
-                alloc.getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR));
+                    alloc.getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR));
             valuesToMail.put(Constants.DATE_START_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_START_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_START_FIELD_NAME));
             valuesToMail.put(Constants.TIME_START_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_START_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_START_FIELD_NAME));
             valuesToMail.put(Constants.DATE_END_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_END_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.DATE_END_FIELD_NAME));
             valuesToMail.put(Constants.TIME_END_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_END_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.TIME_END_FIELD_NAME));
             valuesToMail.put(Constants.RESOURCE_ID_FIELD,
-                alloc.getString(RESERVE_RS_DOT + Constants.RESOURCE_ID_FIELD));
+                    alloc.getString(RESERVE_RS_DOT + Constants.RESOURCE_ID_FIELD));
             valuesToMail.put(Constants.QUANTITY_FIELD,
-                alloc.getNeutralValue(RESERVE_RS_DOT + Constants.QUANTITY_FIELD));
+                    alloc.getNeutralValue(RESERVE_RS_DOT + Constants.QUANTITY_FIELD));
             allQueriesOk = true;
         }
         return allQueriesOk;
@@ -1554,45 +1604,45 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @return true if the info was found, false if nothing was found
      */
     private boolean retrieveRoomInfo(final String rmrsResId,
-            final Map<String, String> valuesToMail) {
+                                     final Map<String, String> valuesToMail) {
         boolean allQueriesOk = false;
         final DataSource reserveRoomDs = DataSourceFactory.createDataSourceForFields(
-            Constants.RESERVE_RM_TABLE,
-            new String[] { Constants.RMRES_ID_FIELD_NAME, Constants.DATE_START_FIELD_NAME,
-                    Constants.TIME_START_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
-                    Constants.TIME_END_FIELD_NAME, Constants.BL_ID_FIELD_NAME,
-                    Constants.FL_ID_FIELD_NAME, Constants.RM_ID_FIELD_NAME,
-                    Constants.CONFIG_ID_FIELD_NAME, Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME });
+                Constants.RESERVE_RM_TABLE,
+                new String[] { Constants.RMRES_ID_FIELD_NAME, Constants.DATE_START_FIELD_NAME,
+                        Constants.TIME_START_FIELD_NAME, Constants.DATE_END_FIELD_NAME,
+                        Constants.TIME_END_FIELD_NAME, Constants.BL_ID_FIELD_NAME,
+                        Constants.FL_ID_FIELD_NAME, Constants.RM_ID_FIELD_NAME,
+                        Constants.CONFIG_ID_FIELD_NAME, Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME });
         reserveRoomDs.addTable(Constants.RESERVE_TABLE_NAME, DataSource.ROLE_STANDARD);
         reserveRoomDs.addField(Constants.RESERVE_TABLE_NAME, USER_REQUESTED_FOR);
         reserveRoomDs.addRestriction(
-            Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RMRES_ID_FIELD_NAME, rmrsResId));
+                Restrictions.eq(Constants.RESERVE_RM_TABLE, Constants.RMRES_ID_FIELD_NAME, rmrsResId));
 
         final DataRecord alloc = reserveRoomDs.getRecord();
 
         if (alloc != null) {
             valuesToMail.put(Constants.RMRES_ID_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RM_DOT + Constants.RMRES_ID_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RM_DOT + Constants.RMRES_ID_FIELD_NAME));
             valuesToMail.put(USER_REQUESTED_FOR,
-                alloc.getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR));
+                    alloc.getString(Constants.RESERVE_TABLE_NAME + Constants.DOT + USER_REQUESTED_FOR));
             valuesToMail.put(Constants.DATE_START_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_START_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_START_FIELD_NAME));
             valuesToMail.put(Constants.TIME_START_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_START_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_START_FIELD_NAME));
             valuesToMail.put(Constants.DATE_END_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_END_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RM_DOT + Constants.DATE_END_FIELD_NAME));
             valuesToMail.put(Constants.TIME_END_FIELD_NAME,
-                alloc.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_END_FIELD_NAME));
+                    alloc.getNeutralValue(RESERVE_RM_DOT + Constants.TIME_END_FIELD_NAME));
             valuesToMail.put(Constants.BL_ID_FIELD_NAME,
-                alloc.getString(RESERVE_RM_DOT + Constants.BL_ID_FIELD_NAME));
+                    alloc.getString(RESERVE_RM_DOT + Constants.BL_ID_FIELD_NAME));
             valuesToMail.put(Constants.FL_ID_FIELD_NAME,
-                alloc.getString(RESERVE_RM_DOT + Constants.FL_ID_FIELD_NAME));
+                    alloc.getString(RESERVE_RM_DOT + Constants.FL_ID_FIELD_NAME));
             valuesToMail.put(Constants.RM_ID_FIELD_NAME,
-                alloc.getString(RESERVE_RM_DOT + Constants.RM_ID_FIELD_NAME));
+                    alloc.getString(RESERVE_RM_DOT + Constants.RM_ID_FIELD_NAME));
             valuesToMail.put(Constants.CONFIG_ID_FIELD_NAME,
-                alloc.getString(RESERVE_RM_DOT + Constants.CONFIG_ID_FIELD_NAME));
+                    alloc.getString(RESERVE_RM_DOT + Constants.CONFIG_ID_FIELD_NAME));
             valuesToMail.put(Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME,
-                alloc.getString(RESERVE_RM_DOT + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME));
+                    alloc.getString(RESERVE_RM_DOT + Constants.RM_ARRANGE_TYPE_ID_FIELD_NAME));
             allQueriesOk = true;
         }
         return allQueriesOk;
@@ -1605,20 +1655,20 @@ public class ReservationsCommonHandler extends ReservationsEventHandlerBase {
      * @param valuesToMail container to store the approver info
      */
     private void findApproverInfo(final String userToNotify,
-            final Map<String, String> valuesToMail) {
+                                  final Map<String, String> valuesToMail) {
         // Search the email and locale of the user to notify
         final DataSource userDs = DataSourceFactory.createDataSourceForFields(
-            Constants.AFM_USERS_TABLE, new String[] { Constants.EMAIL_FIELD_NAME, LOCALE });
+                Constants.AFM_USERS_TABLE, new String[] { Constants.EMAIL_FIELD_NAME, LOCALE });
         userDs
-            .addRestriction(Restrictions.eq(Constants.AFM_USERS_TABLE, "user_name", userToNotify));
+                .addRestriction(Restrictions.eq(Constants.AFM_USERS_TABLE, "user_name", userToNotify));
         final DataRecord userRecord = userDs.getRecord();
 
         // If the email and locale is found
         if (userRecord != null) {
             valuesToMail.put(LOCALE,
-                userRecord.getString(Constants.AFM_USERS_TABLE + Constants.DOT + LOCALE));
+                    userRecord.getString(Constants.AFM_USERS_TABLE + Constants.DOT + LOCALE));
             valuesToMail.put("approveremail", userRecord
-                .getString(Constants.AFM_USERS_TABLE + Constants.DOT + Constants.EMAIL_FIELD_NAME));
+                    .getString(Constants.AFM_USERS_TABLE + Constants.DOT + Constants.EMAIL_FIELD_NAME));
         }
     }
 

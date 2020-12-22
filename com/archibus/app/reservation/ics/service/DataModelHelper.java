@@ -1,14 +1,25 @@
 package com.archibus.app.reservation.ics.service;
 
+import java.text.DateFormat;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
+
+import org.jfree.util.Log;
 
 import com.archibus.app.reservation.dao.datasource.Constants;
 import com.archibus.app.reservation.domain.*;
 import com.archibus.app.reservation.ics.domain.*;
 import com.archibus.app.reservation.service.helpers.WebCentralCalendarServiceHelper;
 import com.archibus.app.reservation.util.TimeZoneCache;
+import com.archibus.datasource.*;
+import com.archibus.datasource.restriction.Restrictions;
+import com.archibus.datasource.data.DataRecord;
 import com.archibus.utility.StringUtil;
+
+
+
+
 
 import net.fortuna.ical4j.model.TimeZoneRegistryFactory;
 
@@ -75,8 +86,8 @@ public final class DataModelHelper {
      * @return the data model to be used
      */
     public static Map<String, Object> prepareDataModel(final Map<String, String> messages,
-            final EmailModel emailModel, final RoomReservation reservation, final String message,
-            final TimeZoneCache timeZoneCache) {
+                                                       final EmailModel emailModel, final RoomReservation reservation, final String message,
+                                                       final TimeZoneCache timeZoneCache) {
 
         final Map<String, Object> dataModel = new HashMap<String, Object>();
 
@@ -84,8 +95,11 @@ public final class DataModelHelper {
          * Always set the requested by employee, even if cancelled by someone else. Attendees don't
          * need to know who pushed the button.
          */
-        dataModel.put(USER, reservation.getRequestedBy());
-
+        // dataModel.put(USER, reservation.getRequestedBy());
+        // Changed by Pankaj@LBNL Get Employee name instead of employee id
+        String strReuestedByName=lblGetEmployeename(reservation.getRequestedBy());
+        strReuestedByName +=".";
+        dataModel.put(USER, strReuestedByName);
         // always set the ${reservation_name!""} parameter for the subject
         if (StringUtil.notNullOrEmpty(reservation.getReservationName())) {
             dataModel.put(RESERVATION_NAME, reservation.getReservationName() + SEPARATOR);
@@ -96,7 +110,10 @@ public final class DataModelHelper {
         if (StringUtil.notNullOrEmpty(message)) {
             dataModel.put(USER_MSG, message);
         } else {
-            dataModel.put(USER_MSG, "");
+            // dataModel.put(USER_MSG, "");
+            // Added by Pankaj@LBNL
+            String message2="\nYour request for a reservation has been " + reservation.getStatus() + ".\r\nGiven below are the details of your reservation: ";
+            dataModel.put(USER_MSG, message2);
         }
 
         MeetingLocationModel primaryLocation = null;
@@ -127,28 +144,33 @@ public final class DataModelHelper {
             dataModel.put(LOCATION, messages.get(IcsConstants.CONF_CALL_MEETING_LOCATION));
         } else {
             dataModel.put(LOCATION, String.format("%s-%s-%s", primaryLocation.getBuilding(),
-                primaryLocation.getFloor(), primaryLocation.getRoom()));
+                    primaryLocation.getFloor(), primaryLocation.getRoom()));
         }
 
         final Date startDate = getStartDate(emailModel, reservation);
 
         dataModel.put(IcsConstants.DATE_START,
-            WebCentralCalendarServiceHelper.getDateFormatted(reservation.getStartDate()));
+                WebCentralCalendarServiceHelper.getDateFormatted(reservation.getStartDate()));
+
         dataModel.put(Constants.TIME_START_FIELD_NAME,
-            WebCentralCalendarServiceHelper.getTimeFormatted(reservation.getStartTime()));
+                WebCentralCalendarServiceHelper.getTimeFormatted(reservation.getStartTime()));
         dataModel.put(Constants.TIME_END_FIELD_NAME,
-            WebCentralCalendarServiceHelper.getTimeFormatted(reservation.getEndTime()));
+                WebCentralCalendarServiceHelper.getTimeFormatted(reservation.getEndTime()));
+
 
         final String tzone = primaryLocation.getTimezone();
         dataModel.put("timezone", tzone);
         final TimePeriod timePeriod = new TimePeriod(startDate, null, reservation.getStartTime(),
-            reservation.getEndTime());
+                reservation.getEndTime());
+
+
 
         // calculate the offset for this date from the time zone information
         dataModel.put(OFFSET,
-            formatTimezoneOffset(getOffset(tzone, timePeriod.getStartDateTime().getTime())));
+                formatTimezoneOffset(getOffset(tzone, timePeriod.getStartDateTime().getTime())));
 
         dataModel.put(IcsConstants.COMMENTS, reservation.getComments());
+
 
         return dataModel;
     }
@@ -162,7 +184,7 @@ public final class DataModelHelper {
      * @return the populated location data model
      */
     private static MeetingLocationModel addSingleInfo(final RoomReservation reservation,
-            final TimeZoneCache timeZoneCache, final Map<String, Object> dataModel) {
+                                                      final TimeZoneCache timeZoneCache, final Map<String, Object> dataModel) {
         final MeetingLocationModel primaryLocation;
         // APP-1983 - reservation might not have a room
         if (reservation.getRoomAllocations().isEmpty()) {
@@ -188,20 +210,21 @@ public final class DataModelHelper {
      * @return the ICS simplified data model map
      */
     public static Map<String, Object> getIcsDataModelMap(final Map<String, String> messages,
-            final EmailModel emailModel, final Map<String, Object> dataModel) {
+                                                         final EmailModel emailModel, final Map<String, Object> dataModel) {
 
         final Map<String, Object> icsDataModel = new HashMap<String, Object>();
         if (dataModel.containsKey(IcsConstants.RESERVATION_NAME)) {
             icsDataModel.put(IcsConstants.RESERVATION_NAME,
-                dataModel.get(IcsConstants.RESERVATION_NAME));
+                    dataModel.get(IcsConstants.RESERVATION_NAME));
         }
 
         icsDataModel.put(IcsConstants.DATE_START, dataModel.get(IcsConstants.DATE_START));
         icsDataModel.put(Constants.TIME_START_FIELD_NAME,
-            dataModel.get(Constants.TIME_START_FIELD_NAME));
+                dataModel.get(Constants.TIME_START_FIELD_NAME));
         icsDataModel.put(Constants.TIME_END_FIELD_NAME,
-            dataModel.get(Constants.TIME_END_FIELD_NAME));
+                dataModel.get(Constants.TIME_END_FIELD_NAME));
         icsDataModel.put("time_offset", dataModel.get(OFFSET));
+
 
         if (dataModel.containsKey(Constants.TYPE_RECURRING)) {
             icsDataModel.put(Constants.TYPE_RECURRING, dataModel.get(Constants.TYPE_RECURRING));
@@ -212,11 +235,11 @@ public final class DataModelHelper {
         if (emailModel.isCancel()) {
             // Indicate that's a cancelled reservation
             icsDataModel.put(UPDATE_OR_CANCEL,
-                SEPARATOR + messages.get(IcsConstants.SUBJECT_CAN_MSG));
+                    SEPARATOR + messages.get(IcsConstants.SUBJECT_CAN_MSG));
         } else if (emailModel.isChange()) {
             // Indicate that's an updated reservation
             icsDataModel.put(UPDATE_OR_CANCEL,
-                SEPARATOR + messages.get(IcsConstants.SUBJECT_UPD_MSG));
+                    SEPARATOR + messages.get(IcsConstants.SUBJECT_UPD_MSG));
         }
 
         final String messageId;
@@ -252,7 +275,7 @@ public final class DataModelHelper {
      * @return the start date
      */
     private static Date getStartDate(final EmailModel emailModel,
-            final RoomReservation reservation) {
+                                     final RoomReservation reservation) {
         final Date startDate;
         if (emailModel.isAllRecurrences() && reservation.getRecurrence() != null) {
             startDate = reservation.getRecurrence().getStartDate();
@@ -269,7 +292,7 @@ public final class DataModelHelper {
      * @param allocation the room allocation to check for comments
      */
     private static void addRoomComments(final Map<String, Object> dataModel,
-            final RoomAllocation allocation) {
+                                        final RoomAllocation allocation) {
         if (StringUtil.notNullOrEmpty(allocation.getComments())) {
             dataModel.put(RM_COMMENTS, allocation.getComments());
         }
@@ -286,8 +309,8 @@ public final class DataModelHelper {
      * @return the location model
      */
     private static MeetingLocationModel addRecurringInfo(final Map<String, String> messages,
-            final EmailModel emailModel, final RoomReservation reservation,
-            final Map<String, Object> dataModel, final TimeZoneCache timeZoneCache) {
+                                                         final EmailModel emailModel, final RoomReservation reservation,
+                                                         final Map<String, Object> dataModel, final TimeZoneCache timeZoneCache) {
 
         dataModel.put("recurring", SEPARATOR + messages.get(IcsConstants.SUBJECT_REC_MSG));
         MeetingLocationModel primaryLocation = null;
@@ -337,20 +360,20 @@ public final class DataModelHelper {
      * @param timezone the time zone string
      */
     private static void addDateListEntry(final StringBuilder builder,
-            final RoomAllocation allocation, final Map<String, String> messages,
-            final String timezone) {
+                                         final RoomAllocation allocation, final Map<String, String> messages,
+                                         final String timezone) {
 
         // calculate the offset for this date
         final int offset = getOffset(timezone, allocation.getStartDateTime().getTime());
 
         builder.append("  * ").append(messages.get(IcsConstants.BODY_START_DT_MSG)).append(' ')
-            .append(WebCentralCalendarServiceHelper.getDateFormatted(allocation.getStartDate()))
-            .append(' ').append(messages.get(IcsConstants.BODY_START_TM_MSG)).append(' ')
-            .append(WebCentralCalendarServiceHelper.getTimeFormatted(allocation.getStartTime()))
-            .append(' ').append(GMT).append(formatTimezoneOffset(offset)).append(' ')
-            .append(messages.get(IcsConstants.BODY_END_TM_MSG)).append(' ')
-            .append(WebCentralCalendarServiceHelper.getTimeFormatted(allocation.getEndTime()))
-            .append(' ').append(GMT).append(formatTimezoneOffset(offset)).append('\n');
+                .append(WebCentralCalendarServiceHelper.getDateFormatted(allocation.getStartDate()))
+                .append(' ').append(messages.get(IcsConstants.BODY_START_TM_MSG)).append(' ')
+                .append(WebCentralCalendarServiceHelper.getTimeFormatted(allocation.getStartTime()))
+                .append(' ').append(GMT).append(formatTimezoneOffset(offset)).append(' ')
+                .append(messages.get(IcsConstants.BODY_END_TM_MSG)).append(' ')
+                .append(WebCentralCalendarServiceHelper.getTimeFormatted(allocation.getEndTime()))
+                .append(' ').append(GMT).append(formatTimezoneOffset(offset)).append('\n');
     }
 
     /**
@@ -376,7 +399,7 @@ public final class DataModelHelper {
 
         if ((absOffset % IcsConstants.CONSTANT60) > 0) {
             builder.append(':')
-                .append(timeZoneFormatter.format(absOffset % IcsConstants.CONSTANT60));
+                    .append(timeZoneFormatter.format(absOffset % IcsConstants.CONSTANT60));
         }
 
         return builder.toString();
@@ -395,9 +418,29 @@ public final class DataModelHelper {
         if (timeZone == null) {
             // @translatable
             throw new CalendarException("Unknown time zone [{0}] - cannot determine offset",
-                DataModelHelper.class, timezone);
+                    DataModelHelper.class, timezone);
         }
         return timeZone.getOffset(datetime);
     }
 
+    // LBNL Pankaj- Get Employee name
+    private static String lblGetEmployeename(String strEmid)
+    {
+        String strEmployeeName="";
+        String[] fields={"em.em_number","em.name_last","em.name_first"};
+        String[] tables={"em"};
+        DataSource ds=DataSourceFactory.createDataSourceForFields(tables,fields);
+
+
+        ds.addRestriction(Restrictions.eq("em","em_id",strEmid));
+        DataRecord record=ds.getRecord();
+        if (record != null)
+            strEmployeeName=record.getString("em.name_first") + " " + record.getString("em.name_last");
+        record=null;
+        ds=null;
+
+        return strEmployeeName;
+
+    }
 }
+
