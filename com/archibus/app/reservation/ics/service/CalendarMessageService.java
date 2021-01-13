@@ -11,8 +11,13 @@ import com.archibus.app.reservation.service.IEmployeeService;
 import com.archibus.app.reservation.util.*;
 import com.archibus.config.MailPreferences;
 import com.archibus.context.ContextStore;
+import com.archibus.datasource.DataSource;
+import com.archibus.datasource.DataSourceFactory;
+import com.archibus.datasource.data.DataRecord;
+import com.archibus.datasource.restriction.Restrictions;
 import com.archibus.jobmanager.EventHandlerContext;
 import com.archibus.utility.StringUtil;
+import com.archibus.utility.Utility;
 
 /**
  * Provides the ICS generation and email sending, if the Exchange Integration is disabled.
@@ -502,6 +507,19 @@ public class CalendarMessageService {
                                           final RoomReservation reservation, final String uid, final IcsMessage ics,
                                           final MeetingLocationModel location) {
 
+        //LBNL Brent -
+        String restrict = "res_id = '" + reservation.getReserveId() +"'";
+
+        DataSource ds = DataSourceFactory.createDataSource();
+        ds.addTable("reserve");
+        ds.addField("res_id");
+        ds.addField("lbl_date_start");
+        ds.addField("lbl_time_start");
+
+        ds.addRestriction(Restrictions.sql(restrict));
+        DataRecord resRec = ds.getRecord();
+        //- LBNL Brent
+
         TimePeriod timePeriod = null;
         if (emailModel.isAllRecurrences() && reservation.getRecurringDateModified() != 0) {
             // set start date to the first occurrence having its original date
@@ -530,7 +548,7 @@ public class CalendarMessageService {
                 model.setRecurrence((AbstractIntervalPattern) reservation.getRecurrence());
 
             } else if (emailModel.isRecurring() && reservation.getRecurringDateModified() == 0) {
-                model.setRecurrenceId(reservation.getStartDateTime());
+                model.setRecurrenceId(Utility.toDatetime(resRec.getDate("reserve.lbl_date_start"),resRec.getDate("reserve.lbl_time_start"))); //LBNL Brent
             }
         }
 
