@@ -1,9 +1,14 @@
 package com.archibus.app.reservation.ics.service;
 
 import java.util.Date;
+import java.util.List;
 
 import com.archibus.app.reservation.ics.domain.*;
 import com.archibus.app.reservation.util.TimeZoneConverter;
+import com.archibus.datasource.DataSource;
+import com.archibus.datasource.DataSourceFactory;
+import com.archibus.datasource.data.DataRecord;
+import com.archibus.datasource.restriction.Restrictions;
 
 import net.fortuna.ical4j.model.*;
 import net.fortuna.ical4j.model.component.*;
@@ -53,8 +58,7 @@ public final class IcsCalendarBuilder {
                 TimeZoneRegistryFactory.getInstance().createRegistry().getTimeZone(tzone);
 
 
-
-
+          
         // enter the time in server time zone
         final DateTime start = getTimezonedDateTime(model.getStartDateTime(), timezone);
 
@@ -67,16 +71,46 @@ public final class IcsCalendarBuilder {
 
         final PropertyList<Property> propertyList = meeting.getProperties();
 
+        
+        //Added by Pankaj@LBNL
+        // Get the latest revision number of the reservation or the parent reservation (in case of recurring one)
+        int intRevision=0;
+      
+        String strWhere=" (res_id = '" + model.getUid() +"' OR res_parent='" + model.getUid() +"') " ;
+               strWhere += " and (lbl_revision_number =(select max(b.lbl_revision_number) from reserve b where ";
+               strWhere += " (b.res_id = '" + model.getUid() +"' OR b.res_parent='" + model.getUid() +"')))" ;
+                              
+               DataSource ds = DataSourceFactory.createDataSource();
+               ds.addTable("reserve");
+               ds.addField("lbl_revision_number");
+               ds.addSort("reserve","lbl_revision_number", DataSource.SORT_DESC);
+               ds.addRestriction(Restrictions.sql(strWhere));
+             	 List <DataRecord> records=ds.getRecords();
+
+
+               for (DataRecord record : records) {
+            	   intRevision=record.getInt("reserve.lbl_revision_number");
+            	   break;
+                 }
+         
+          intRevision++;
+          ds=null;
+        
         final int sequenceNumber;
-        if (emailModel.isCancel()) {
+        /*  Commented by Pankaj@LBNL     
+            if (emailModel.isCancel()) {
+         
             propertyList.add(net.fortuna.ical4j.model.property.Status.VEVENT_CANCELLED);
-            sequenceNumber = 2;
-        } else if (emailModel.isChange() && emailModel.isRecurring()
+            sequenceNumber = 2;  
+           } else if (emailModel.isChange() && emailModel.isRecurring()
                 && !emailModel.isAllRecurrences()) {
-            sequenceNumber = 1;
+            sequenceNumber = 1; 
+        	
         } else {
-            sequenceNumber = 0;
-        }
+            sequenceNumber = 0;  
+            
+        }*/
+        sequenceNumber=intRevision; // Added by Pankaj@LBNL
 
         // Pankaj@ LBNL added property
         propertyList.add(net.fortuna.ical4j.model.property.Transp.TRANSPARENT);
