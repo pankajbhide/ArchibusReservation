@@ -600,8 +600,83 @@ public class RoomReservationService extends RoomReservationWfrBase {
 
         // System.out.println(sumAttendees);
 
-        if((maxCapacity-sumAttendees)>0)return maxCapacity-sumAttendees;
-        else return 0;
+        //LBL added rec logic
+
+        String recurXml = reservation.getString("reserve.recurring_rule");
+        String isoDateStart = reservation.getDate("reserve.date_start").toString();
+        String isoDateEnd = reservation.getDate("reserve.date_end").toString();
+
+        String pmDateStart = "";
+        String pmDateEnd = "";
+
+        pmDateStart += isoDateStart.substring(isoDateStart.indexOf("-") + 1, isoDateStart.indexOf("-") + 3) + "/"
+                + isoDateStart.substring(isoDateStart.indexOf("-", isoDateStart.indexOf("-") + 1) + 1) + "/"
+                + isoDateStart.substring(0, isoDateStart.indexOf("-"));
+
+        pmDateEnd += isoDateEnd.substring(isoDateEnd.indexOf("-") + 1, isoDateEnd.indexOf("-") + 3) + "/"
+                + isoDateEnd.substring(isoDateEnd.indexOf("-", isoDateEnd.indexOf("-") + 1) + 1) + "/"
+                + isoDateEnd.substring(0, isoDateEnd.indexOf("-"));
+
+        boolean recurrence = false;
+        String[] occurrenceList = parseRecurrenceXml(recurXml, pmDateStart, pmDateEnd);
+        recurrence = occurrenceList.length>0;
+
+        String pmBlId = roomA.getBlId();
+        String pmFlId = roomA.getFlId();
+        String pmRmId = roomA.getRmId();
+        String pmConfigId = roomA.getConfigId();
+        String pmRmArrangeId = roomA.getRoomArrangement().getArrangeTypeId();
+        String fPmTimeStart = roomA.getStartTime().toString();
+        String fPmTimeEnd = roomA.getEndTime().toString();
+
+        int minSpace = Integer.MAX_VALUE;
+        if(recurrence){
+            for(String reccurDate : occurrenceList){
+                DataSource recdsc = DataSourceFactory.createDataSource();
+                recdsc.addTable("rm_arrange");
+                recdsc.addField("max_capacity");
+
+                String recCapacityRest = "bl_id = '" + pmBlId + "' AND fl_id = '" + pmFlId +"' AND rm_id = '" + pmRmId +"' AND config_id = '" + pmConfigId +"' AND rm_arrange_type_id = '" + pmRmArrangeId  + "'";
+
+                DataRecord recmCapacityRec = recdsc.getRecord(recCapacityRest);
+                int recMaxCapacity = recmCapacityRec.getInt("rm_arrange.max_capacity");
+                int recSumAttendees = 0;
+
+                String recoverlap = "bl_id = '" + pmBlId + "' AND fl_id = '" + pmFlId +"' AND rm_id = '" + pmRmId +
+                        "' AND config_id = '" + pmConfigId +"' AND rm_arrange_type_id = '" + pmRmArrangeId +
+                        "' AND  date_start <= to_date('" + reccurDate + "','MM/DD/YYYY')"+ " AND date_end >= to_date('"+ reccurDate +
+                        "','MM/DD/YYYY')" + " AND  time_start < to_date('12-30-1899 "+ fPmTimeEnd +"','MM-DD-YYYY HH24:MI:SS')" +
+                        " AND time_end > to_date('12-30-1899 "+ fPmTimeStart +"','MM-DD-YYYY HH24:MI:SS')" +  " AND status='Confirmed'";
+
+                DataSource recds = DataSourceFactory.createDataSource();
+                recds.addTable("reserve_rm");
+                recds.addField("bl_id");
+                recds.addField("fl_id");
+                recds.addField("rm_id");
+                recds.addField("config_id");
+                recds.addField("rm_arrange_type_id");
+                recds.addField("date_start");
+                recds.addField("date_end");
+                recds.addField("time_start");
+                recds.addField("time_end");
+                recds.addField("status");
+                recds.addField("attendees_in_room");
+
+                recds.addRestriction(Restrictions.sql(recoverlap));
+                List<DataRecord> recConcurrentRecs = recds.getRecords();
+
+                for (DataRecord d:recConcurrentRecs) {
+                    recSumAttendees+=d.getInt("reserve_rm.attendees_in_room");
+                }
+                if (recMaxCapacity-recSumAttendees<minSpace) minSpace = recMaxCapacity-recSumAttendees;
+            }
+        }
+        int availCap = recurrence ? minSpace : maxCapacity-sumAttendees;
+        return availCap;
+
+        //LBL added rec logic
+//        if((maxCapacity-sumAttendees)>0)return maxCapacity-sumAttendees;
+//        else return 0;
     }
     /**
      * Calculate total cost of the reservation.

@@ -79,7 +79,7 @@ public final class IcsCalendarBuilder {
         String strWhere=" (res_id = '" + model.getUid() +"' OR res_parent='" + model.getUid() +"') " ;
                strWhere += " and (lbl_revision_number =(select max(b.lbl_revision_number) from reserve b where ";
                strWhere += " (b.res_id = '" + model.getUid() +"' OR b.res_parent='" + model.getUid() +"')))" ;
-                              
+                               
                DataSource ds = DataSourceFactory.createDataSource();
                ds.addTable("reserve");
                ds.addField("lbl_revision_number");
@@ -87,7 +87,7 @@ public final class IcsCalendarBuilder {
                ds.addRestriction(Restrictions.sql(strWhere));
              	 List <DataRecord> records=ds.getRecords();
 
-
+   
                for (DataRecord record : records) {
             	   intRevision=record.getInt("reserve.lbl_revision_number");
             	   break;
